@@ -1,0 +1,6 @@
+numpy~=2.3.4
+matplotlib~=3.10.7
+pydotthz~=1.0.1
+scipy~=1.16.2
+shapely~=2.1.2
+tqdm~=4.67.1

@@ -6,8 +6,10 @@ from pydotthz import DotthzFile
 from math_utils import get_fft, get_ifft
 from scipy.signal import find_peaks
 import scipy.constants
+from tqdm import tqdm
 
-from deconvolution import Deconvolution
+from thz_deconvolution import Deconvolution
+from envelope import gaussian_kernel1d, convolve1d, envelope_hilbert
 
 
 def get_dynamic_range(data, percentile=0.999):
@@ -239,6 +241,16 @@ def detect_first_zero_crossing_after_peak(t, signal, height=5):
     return None  # No zero crossing found
 
 
+def detect_first_peak(t, signal, height=5):
+    # Step 1: Find the first positive peak
+    peaks, _ = find_peaks(signal, height=height)
+    if len(peaks) == 0:
+        return None  # No peaks found
+
+    first_peak_index = peaks[0]
+
+    return t[first_peak_index]
+
 def get_thickness(t1, t2, angle=19):
     l = 6 * 25.4 / 1000
     delta_t = np.abs(t2 - t1) * 1e-12
@@ -262,12 +274,13 @@ def get_time_diff(d, angle=19):
 if __name__ == '__main__':
 
     path = Path("/Users/linus/Documents/COC_terrain/data_image_rfl/1758834352.9015865_data.thz")
-    path = Path("/Users/linus/Documents/COC_SPHERES_fine_scan/data_image_rfl/1759959272.6226816_data.thz")
-    # path = Path("/Users/linus/Documents/COC_FULL_SPHERES_fine_scan/data_image_rfl/1760023882.972197_data.thz")
+    # path = Path("/Users/linus/Documents/COC_SPHERES_fine_scan/data_image_rfl/1759959272.6226816_data.thz")
+    path = Path("/Users/linus/Documents/COC_FULL_SPHERES_fine_scan/data_image_rfl/1760023882.972197_data.thz")
     # path = Path("/Users/linus/Documents/resolution_scan_A_high_res_6/data_image_rfl/1760606720.3549016_data.thz")
     # path = Path("/Users/linus/Documents/COC_SPHERES_fine_scan_2/data_image_rfl/1759993463.423583_data.thz")
     # path = Path("/Users/linus/Documents/COC_SPHERES_ext_rng/data_image_rfl/1744835132.148543_data.thz")
     # path = Path("/Users/linus/Documents/COC_terrain_res_target_2/data_image_rfl/1759921401.9838753_data.thz")
+    # path = Path("/Users/linus/Documents/DUST_surface_res_target_3d_3/data_image_rfl/1760633536.387254_data.thz")
 
     with DotthzFile(path) as psf_data:
         key = list(psf_data.keys())[0]
@@ -287,66 +300,70 @@ if __name__ == '__main__':
 
     traces = traces[::, ::, :]
 
-    # Decon = Deconvolution(psf_path=Path("psf_data/psf.npz"), low_cut=0.1, high_cut=5.0)
-    Decon = Deconvolution(
-        knife_edge_x_path=Path("psf_data/example_beam_width/measurement_x/data/1750085285.8557956_data.thz"),
-        knife_edge_y_path=Path("psf_data/example_beam_width/measurement_y/data/1750163177.929295_data.thz"),
-        low_cut=0.1, start_freq=0.1, high_cut=5.0)
-    deconvolved_traces = Decon.apply_deconvolution(traces, x_min, x_max, width, y_min, y_max, height, max_iter=100)
-    traces = deconvolved_traces
+    # # Decon = Deconvolution(psf_path=Path("psf_data/psf.npz"), low_cut=0.1, high_cut=5.0)
+    # Decon = Deconvolution(
+    #     knife_edge_x_path=Path("psf_data/example_beam_width/measurement_x/data/1750085285.8557956_data.thz"),
+    #     knife_edge_y_path=Path("psf_data/example_beam_width/measurement_y/data/1750163177.929295_data.thz"),
+    #     low_cut=1.0, start_freq=1.0, high_cut=5.0)
+    # deconvolved_traces = Decon.apply_deconvolution(traces, x_min, x_max, width, y_min, y_max, height, max_iter=100)
+    # traces = deconvolved_traces
 
-    # p = p[::2, ::2, t < 1912]
-    # t = t[t < 1912]
+    # p = traces[::, ::, times < 1912]
+    # t = times[times < 1912]
 
-    t = times
     p = traces[::, ::, :]
+    t = times[:]
 
     # p = p[p.shape[0]//2-10:p.shape[0]//2+10, ::2, :]
     # x_min = -5
     # x_max = 5
     surface = np.zeros(p.shape[:2])
-
-    for x in range(p.shape[0]):
+    kernel = gaussian_kernel1d(sigma=6.0, radius=12)
+    for x in tqdm(range(p.shape[0])):
         for y in range(p.shape[1]):
 
-            # f, a, arg = get_fft(t, p[x, y, :])
-            #
-            # a[f < 1.0] = 0
-            # a[f > 5.0] = 0
-            #
-            # time, pulse = get_ifft(f, a, arg, t0=t[0])
+            f, a, arg = get_fft(t, p[x, y, :])
 
-            time, pulse = t, p[x, y, :]
+            a[f < 1.0] = 0
+            a[f > 5.0] = 0
 
-            if x == 0 and y == 0:
-                plt.plot(1000 * (time - time[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12,
-                         pulse / np.max(pulse))
-                plt.plot(1000 * (t - t[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12,
-                         p[x, y, :] / np.max(p[x, y, :]), ls="--")
-            if x == p.shape[0] // 2 and y == p.shape[1] // 2:
-                plt.plot(1000 * (time - time[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12,
-                         pulse / np.max(pulse))
-                plt.plot(1000 * (t - t[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12,
-                         p[x, y, :] / np.max(p[x, y, :]), ls="--")
-                plt.show()
+            time, pulse = get_ifft(f, a, arg, t0=t[0])
 
             # t1 = detect_first_zero_crossing_after_peak(time, pulse, height=1.2)
 
-            noise_level = np.mean(np.abs(pulse))
+            convolved_data = envelope_hilbert(pulse)
+            # convolved_data = convolve1d(pulse ** 2, kernel)
 
-            threshold = (get_dynamic_range(pulse) - noise_level) * 0.5
+            noise_mean = np.mean(np.abs(convolved_data[:60]))
+            noise_std = np.std(np.abs(convolved_data[:60]))
 
-            t1 = detect_first_zero_crossing_after_peak(time, pulse, height=noise_level + threshold)
+            threshold = noise_mean + 10.0 * noise_std
+            # threshold = 0.08
+
+            if x == 0 and y == 0:
+                plt.plot(1000 * (time - time[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12,
+                         convolved_data )
+            if x == 21 and y == 138:
+                plt.plot(1000 * (time - time[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12,
+                         convolved_data )
+                plt.axhline(threshold, color='k')
+                plt.axhline(noise_mean, color='red')
+                plt.axvline(1000 * (time[60] - time[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12, color='black')
+                plt.show()
+
+            t1 = detect_first_peak(time, convolved_data, height=threshold)
             if t1 is None:
                 t1 = t[0]
                 # plt.plot(time, pulse)
                 # plt.axhline(np.median(np.abs(pulse)), color="red")
                 # plt.axhline(noise_level, color="orange")
                 # plt.show()
-                if y > 0:
-                    surface[x, y] = surface[x, y - 1]
-                else:
-                    surface[x, y] = surface[x - 1, y]
+                # if y > 0:
+                #     surface[x, y] = surface[x, y - 1]
+                # else:
+                #     surface[x, y] = surface[x - 1, y]
+                surface[x, y] = - get_thickness(t[0], t1) * 1000  # in mm
+
             else:
                 surface[x, y] = - get_thickness(t[0], t1) * 1000  # in mm
 
