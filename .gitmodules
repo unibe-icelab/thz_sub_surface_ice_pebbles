@@ -1,0 +1,3 @@
+[submodule "thz-analysis"]
+	path = thz-analysis
+	url = git@spacegit.unibe.ch:SUBICE/data-analysis/thz-analysis
