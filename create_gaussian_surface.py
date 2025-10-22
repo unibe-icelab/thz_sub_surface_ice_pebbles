@@ -1,10 +1,19 @@
+# python
 import numpy as np
 import trimesh
 from scipy import ndimage
 import matplotlib.pyplot as plt
 
 
-def create_gaussian_surface_cylinder(feature_size: float = 3, plot=False):
+def create_gaussian_surface_cylinder(feature_size: float = 3,
+                                     plot: bool = False,
+                                     flat_quarter: bool = True,
+                                     flat_quarter_range=(0.0, np.pi / 2.0)):
+    """
+    Create a cylinder whose top surface is a Gaussian random surface.
+    If `flat_quarter` is True, a flat quarter (by angle) is left flat; otherwise the Gaussian covers the full circle.
+    """
+
     # Parameters
     outer_diameter = 59.0  # mm
     thickness = feature_size / 2.0 + 1   # mm
@@ -23,12 +32,16 @@ def create_gaussian_surface_cylinder(feature_size: float = 3, plot=False):
     R = np.sqrt(X ** 2 + Y ** 2)
     mask = R <= outer_radius
 
-    # Create flat quarter mask (first quadrant: 0° to 90°)
-    angle = np.arctan2(Y, X)
-    angle = np.where(angle < 0, angle + 2 * np.pi, angle)
-    flat_quarter_mask = (angle >= 0) & (angle <= np.pi / 2)
+    # Create flat quarter mask only if enabled
+    if flat_quarter:
+        angle = np.arctan2(Y, X)
+        angle = np.where(angle < 0, angle + 2 * np.pi, angle)
+        a_min, a_max = flat_quarter_range
+        flat_quarter_mask = (angle >= a_min) & (angle <= a_max)
+    else:
+        flat_quarter_mask = np.zeros_like(mask, dtype=bool)
 
-    # Apply Gaussian surface only outside the flat quarter
+    # Apply Gaussian surface only outside the flat quarter (or whole mask if disabled)
     gaussian_mask = mask & ~flat_quarter_mask
 
     # Generate Gaussian random surface
@@ -71,7 +84,7 @@ def create_gaussian_surface_cylinder(feature_size: float = 3, plot=False):
         plt.ylabel('Y (mm)')
 
         plt.subplot(1, 2, 2)
-        from mpl_toolkits.mplot3d import Axes3D
+        from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
         fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
         X_plot = X[mask]
         Y_plot = Y[mask]
@@ -187,11 +200,6 @@ def create_gaussian_surface_cylinder(feature_size: float = 3, plot=False):
     else:
         actual_amplitude = 0
 
-    # Create and export mesh
-    vertices = np.array(vertices)
-    faces = np.array(faces)
-    mesh = trimesh.Trimesh(vertices=vertices, faces=faces)
-
     # Fix mesh issues for 3D printing
     mesh.remove_duplicate_faces()
     mesh.remove_degenerate_faces()
@@ -205,16 +213,22 @@ def create_gaussian_surface_cylinder(feature_size: float = 3, plot=False):
     if not mesh.is_winding_consistent:
         print("Warning: Inconsistent winding order!")
 
-    mesh.export(f'gaussian_cylinder_{feature_size}.stl')
+    if flat_quarter:
+        mesh.export(f'gaussian_cylinder_{feature_size}.stl')
+    else:
+        mesh.export(f'gaussian_cylinder_{feature_size}_full.stl')
 
-    print(f"STL file created successfully!")
+    mode_msg = "with flat quarter" if flat_quarter else "full Gaussian (no flat quarter)"
+    print(f"STL file created successfully! Mode: {mode_msg}")
     print(f"Mesh has {len(vertices)} vertices and {len(faces)} faces")
     print(f"Actual amplitude: {actual_amplitude:.2f}mm")
-    print(f"Flat quarter: 0° to 90° (positive x, positive y quadrant)")
+    if flat_quarter:
+        print(f"Flat quarter: {flat_quarter_range[0]:.2f} to {flat_quarter_range[1]:.2f} rad")
 
     return mesh
 
 
 if __name__ == "__main__":
-    for d in [1.0,1.5,2.0,2.5,5.0]:
-        create_gaussian_surface_cylinder(d)
+    for d in [1.0, 1.5, 2.0, 2.5, 5.0]:
+        create_gaussian_surface_cylinder(d, plot=False, flat_quarter=False)
+        create_gaussian_surface_cylinder(d, plot=False, flat_quarter=True)
