@@ -271,16 +271,88 @@ def get_time_diff(d, angle=19):
     return delta_t
 
 
+def save_surface_as_point_cloud(surface, x_max, x_min, y_max, y_min, filename, format='txt'):
+    """
+    Save 2D surface data as a point cloud file.
+
+    Args:
+        surface: 2D numpy array with height values
+        x_max, x_min, y_max, y_min: Physical dimensions in mm
+        filename: Output filename
+        format: 'txt', 'csv', 'xyz', or 'ply'
+    """
+    nx, ny = surface.shape
+
+    surface -= np.min(surface)
+
+    # Create coordinate arrays (matching your plotting code)
+    x_mm = np.linspace(y_min, y_max, ny)
+    y_mm = np.linspace(-x_min, -x_max, nx)
+    X, Y = np.meshgrid(x_mm, y_mm, indexing='xy')
+
+    # Flatten arrays to create point cloud
+    x_points = X.flatten()
+    y_points = Y.flatten()
+    z_points = surface.flatten()
+
+    # Remove any NaN or invalid points
+    valid_mask = np.isfinite(z_points)
+    x_points = x_points[valid_mask]
+    y_points = y_points[valid_mask]
+    z_points = z_points[valid_mask]
+
+    print(f"Saving {len(x_points)} points to {filename}")
+    print(f"Point cloud bounds: X[{x_points.min():.2f}, {x_points.max():.2f}], "
+          f"Y[{y_points.min():.2f}, {y_points.max():.2f}], "
+          f"Z[{z_points.min():.2f}, {z_points.max():.2f}]")
+
+    if format.lower() == 'txt':
+        # Save as space-separated text file
+        np.savetxt(filename, np.column_stack([x_points, y_points, z_points]),
+                   fmt='%.6f', delimiter=' ', header='X Y Z', comments='# ')
+
+    elif format.lower() == 'csv':
+        # Save as comma-separated values
+        np.savetxt(filename, np.column_stack([x_points, y_points, z_points]),
+                   fmt='%.6f', delimiter=',', header='X,Y,Z', comments='')
+
+    elif format.lower() == 'xyz':
+        # Save as XYZ format (space-separated, no header)
+        np.savetxt(filename, np.column_stack([x_points, y_points, z_points]),
+                   fmt='%.6f', delimiter=' ')
+
+    elif format.lower() == 'ply':
+        # Save as PLY format
+        with open(filename, 'w') as f:
+            f.write("ply\n")
+            f.write("format ascii 1.0\n")
+            f.write(f"element vertex {len(x_points)}\n")
+            f.write("property float x\n")
+            f.write("property float y\n")
+            f.write("property float z\n")
+            f.write("end_header\n")
+
+            for i in range(len(x_points)):
+                f.write(f"{x_points[i]:.6f} {y_points[i]:.6f} {z_points[i]:.6f}\n")
+
+    else:
+        raise ValueError("Format must be 'txt', 'csv', 'xyz', or 'ply'")
+
+    print(f"Point cloud saved successfully!")
+
+    return x_points, y_points, z_points
+
+
 if __name__ == '__main__':
 
     path = Path("/Users/linus/Documents/COC_terrain/data_image_rfl/1758834352.9015865_data.thz")
     # path = Path("/Users/linus/Documents/COC_SPHERES_fine_scan/data_image_rfl/1759959272.6226816_data.thz")
-    path = Path("/Users/linus/Documents/COC_FULL_SPHERES_fine_scan/data_image_rfl/1760023882.972197_data.thz")
+    # path = Path("/Users/linus/Documents/COC_SPHERES_fine_scan_3/data_image_rfl/1760820898.0132043_data.thz")
+    # path = Path("/Users/linus/Documents/COC_FULL_SPHERES_fine_scan/data_image_rfl/1760023882.972197_data.thz")
     # path = Path("/Users/linus/Documents/resolution_scan_A_high_res_6/data_image_rfl/1760606720.3549016_data.thz")
-    # path = Path("/Users/linus/Documents/COC_SPHERES_fine_scan_2/data_image_rfl/1759993463.423583_data.thz")
     # path = Path("/Users/linus/Documents/COC_SPHERES_ext_rng/data_image_rfl/1744835132.148543_data.thz")
-    # path = Path("/Users/linus/Documents/COC_terrain_res_target_2/data_image_rfl/1759921401.9838753_data.thz")
-    # path = Path("/Users/linus/Documents/DUST_surface_res_target_3d_3/data_image_rfl/1760633536.387254_data.thz")
+    path = Path("/Users/linus/Documents/COC_terrain_res_target_2/data_image_rfl/1759921401.9838753_data.thz")
+    path = Path("/Users/linus/Documents/DUST_surface_res_target_3d_3/data_image_rfl/1760633536.387254_data.thz")
 
     with DotthzFile(path) as psf_data:
         key = list(psf_data.keys())[0]
@@ -300,63 +372,88 @@ if __name__ == '__main__':
 
     traces = traces[::, ::, :]
 
-    # # Decon = Deconvolution(psf_path=Path("psf_data/psf.npz"), low_cut=0.1, high_cut=5.0)
-    # Decon = Deconvolution(
-    #     knife_edge_x_path=Path("psf_data/example_beam_width/measurement_x/data/1750085285.8557956_data.thz"),
-    #     knife_edge_y_path=Path("psf_data/example_beam_width/measurement_y/data/1750163177.929295_data.thz"),
-    #     low_cut=1.0, start_freq=1.0, high_cut=5.0)
-    # deconvolved_traces = Decon.apply_deconvolution(traces, x_min, x_max, width, y_min, y_max, height, max_iter=100)
-    # traces = deconvolved_traces
+    # Decon = Deconvolution(psf_path=Path("psf_data/psf.npz"), low_cut=0.1, high_cut=5.0)
+    Decon = Deconvolution(
+        knife_edge_x_path=Path("psf_data/example_beam_width/measurement_x/data/1750085285.8557956_data.thz"),
+        knife_edge_y_path=Path("psf_data/example_beam_width/measurement_y/data/1750163177.929295_data.thz"),
+        low_cut=1.0, high_cut=5.0)
 
-    # p = traces[::, ::, times < 1912]
-    # t = times[times < 1912]
+    traces_old = traces
+    deconvolved_traces = Decon.apply_deconvolution(traces, x_min, x_max, width, y_min, y_max, height, max_iter=100)
+    traces = deconvolved_traces
 
-    p = traces[::, ::, :]
-    t = times[:]
+    p = traces[::, ::, times < 1912]
+    t = times[times < 1912]
+
+    #p = traces[::, ::, :]
+    #t = times[:]
 
     # p = p[p.shape[0]//2-10:p.shape[0]//2+10, ::2, :]
     # x_min = -5
     # x_max = 5
     surface = np.zeros(p.shape[:2])
-    kernel = gaussian_kernel1d(sigma=6.0, radius=12)
+    kernel = gaussian_kernel1d(sigma=6.0, radius=18)
     for x in tqdm(range(p.shape[0])):
         for y in range(p.shape[1]):
 
-            f, a, arg = get_fft(t, p[x, y, :])
+            # f, a, arg = get_fft(t, p[x, y, :])
+            #
+            # a[f < 1.0] = 0
+            # a[f > 5.0] = 0
+            #
+            # time, pulse = get_ifft(f, a, arg, t0=t[0])
 
-            a[f < 1.0] = 0
-            a[f > 5.0] = 0
-
-            time, pulse = get_ifft(f, a, arg, t0=t[0])
+            time, pulse = t, p[x, y, :]
 
             # t1 = detect_first_zero_crossing_after_peak(time, pulse, height=1.2)
 
-            convolved_data = envelope_hilbert(pulse)
-            # convolved_data = convolve1d(pulse ** 2, kernel)
+            convolved_data_h = envelope_hilbert(pulse)
+            convolved_data = convolve1d(np.abs(pulse), kernel)
 
             noise_mean = np.mean(np.abs(convolved_data[:60]))
             noise_std = np.std(np.abs(convolved_data[:60]))
 
-            threshold = noise_mean + 10.0 * noise_std
-            # threshold = 0.08
-
-            if x == 0 and y == 0:
-                plt.plot(1000 * (time - time[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12,
-                         convolved_data )
-            if x == 21 and y == 138:
-                plt.plot(1000 * (time - time[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12,
-                         convolved_data )
-                plt.axhline(threshold, color='k')
-                plt.axhline(noise_mean, color='red')
-                plt.axvline(1000 * (time[60] - time[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12, color='black')
-                plt.show()
+            threshold = noise_mean + 15.0 * noise_std
+            threshold = 0.4 + convolved_data[0]
 
             t1 = detect_first_peak(time, convolved_data, height=threshold)
+            t1h = detect_first_peak(time, convolved_data_h, height=threshold)
+
+            # threshold = 0.08
+            #
+            # if x == 0 and y == 0:
+            #     plt.plot(1000 * (time - time[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12,
+            #              convolved_data )
+            if x == 21 and y == 138:
+                plt.title(f"Pixel ({x}, {y})")
+                plt.plot(1000 * (time - time[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12,
+                         pulse/np.max(pulse))
+                plt.plot(1000 * (time - time[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12,
+                         convolved_data ,ls="--")
+                plt.plot(1000 * (time - time[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12,
+                         convolved_data_h,ls="--")
+                plt.axhline(threshold, color='blue', label='threshold')
+                plt.axhline(noise_mean, color='red', label='noise mean')
+                plt.axvline(1000 * (time[60] - time[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12, color='black',label='noise gate')
+                plt.axvline(1000 * (t1 - time[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12, color='orange',label='t1')
+                plt.axvline(1000 * (t1h - time[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12, color='green',ls="--",label="Hilbert peak")
+                plt.legend()
+                plt.show()
+
             if t1 is None:
-                t1 = t[0]
-                # plt.plot(time, pulse)
-                # plt.axhline(np.median(np.abs(pulse)), color="red")
-                # plt.axhline(noise_level, color="orange")
+                t1 = t[-1]
+                # plt.title(f"Pixel ({x}, {y})")
+                # plt.plot(1000 * (time - time[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12,
+                #          pulse / np.max(pulse))
+                # plt.plot(1000 * (time - time[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12,
+                #          convolved_data, ls="--")
+                # plt.plot(1000 * (time - time[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12,
+                #          convolved_data_h, ls="--")
+                # plt.axhline(threshold, color='k')
+                # plt.axhline(noise_mean, color='red')
+                # plt.axvline(1000 * (time[60] - time[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12,
+                #             color='black')
+                #
                 # plt.show()
                 # if y > 0:
                 #     surface[x, y] = surface[x, y - 1]
@@ -397,6 +494,9 @@ if __name__ == '__main__':
     #             surface[x, y] = 0
     #         else:
     #             surface[x, y] = get_thickness(t1, 0) * 1000  # in mm
+
+    save_surface_as_point_cloud(surface, x_max, x_min, y_max, y_min,
+                                "extracted_surface_dust_res_target_pointcloud.ply", format='ply')
 
     # Plot the surface as a 3D mesh
     fig = plt.figure()
