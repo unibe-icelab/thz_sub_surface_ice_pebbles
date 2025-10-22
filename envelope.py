@@ -15,25 +15,48 @@ def envelope_hilbert(x: np.ndarray, smooth_sigma: float | None = None) -> np.nda
         env = gaussian_filter1d(env, sigma=smooth_sigma, mode="reflect")
     return env / np.max(env)
 
+# def gaussian_kernel1d(sigma: float, radius: int) -> np.ndarray:
+#     size = 2 * radius + 1
+#     x = np.arange(size) - radius
+#     kernel = np.exp(-x ** 2 / (2 * sigma * sigma))
+#     kernel /= kernel.sum()
+#     return kernel
+#
+#
+# def convolve1d(data: np.ndarray, kernel: np.ndarray) -> np.ndarray:
+#     radius = len(kernel) // 2
+#     output = np.zeros_like(data)
+#     for i in range(len(data)):
+#         acc = 0.0
+#         for k, coeff in enumerate(kernel):
+#             j = i + k - radius
+#             if 0 <= j < len(data):
+#                 acc += data[j] * coeff
+#         output[i] = acc
+#     return output
+
+from scipy.ndimage import gaussian_filter1d
+from scipy.signal import convolve
+
 def gaussian_kernel1d(sigma: float, radius: int) -> np.ndarray:
+    """
+    Fast Gaussian kernel creation using numpy's vectorized operations.
+    Drop-in replacement for the original manual implementation.
+    """
     size = 2 * radius + 1
     x = np.arange(size) - radius
     kernel = np.exp(-x ** 2 / (2 * sigma * sigma))
     kernel /= kernel.sum()
     return kernel
 
-
 def convolve1d(data: np.ndarray, kernel: np.ndarray) -> np.ndarray:
-    radius = len(kernel) // 2
-    output = np.zeros_like(data)
-    for i in range(len(data)):
-        acc = 0.0
-        for k, coeff in enumerate(kernel):
-            j = i + k - radius
-            if 0 <= j < len(data):
-                acc += data[j] * coeff
-        output[i] = acc
-    return output
+    """
+    Fast convolution using scipy's optimized implementation.
+    Drop-in replacement for the original manual loop implementation.
+    """
+    output = convolve(data, kernel, mode='same')
+    return output / np.max(output)
+
 
 
 if __name__ == "__main__":
@@ -42,8 +65,13 @@ if __name__ == "__main__":
         time = np.array(f["Image"]["time"])
         print(data.shape, time.shape)
 
-        kernel = gaussian_kernel1d(sigma=6.0, radius=12)
-        convolved_data = convolve1d(data[30, 30, :] ** 2, kernel)
+        dt = time[1] - time[0]
+        pulse_width = 1 # ps
+        sigma = int(pulse_width / 3 / dt)
+        print(sigma)
+        kernel = gaussian_kernel1d(sigma=sigma, radius=sigma*3)
+        convolved_data = convolve1d(np.abs(data[30, 30, :]), kernel)
+        convolved_data2 = convolve1d(np.abs(data[30, 30, :])**2, kernel)
 
         fig, ax1 = plt.subplots()
         ax1.plot(time, data[30, 30, :], color="black", label="Original Signal")
@@ -53,7 +81,8 @@ if __name__ == "__main__":
         ax1.set_xlim(1875, 1920)
 
         ax2 = ax1.twinx()
-        ax2.plot(time, convolved_data / np.max(convolved_data), color="red", ls="--", label="Convolved Signal")
+        ax2.plot(time, convolved_data , color="red", ls="--", label="Convolved Signal")
+        ax2.plot(time, convolved_data2 , color="green", ls="--", label="Convolved Signal")
         ax2.plot(time, envelope_hilbert(data[30, 30, :]), color="pink", ls="--", label="Hilbert")
         ax2.axhline(0.1, color="orange", ls="--", label="Threshold (0.1)")
         ax2.set_ylabel("Convolved Signal (0-1)")
