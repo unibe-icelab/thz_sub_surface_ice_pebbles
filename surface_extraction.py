@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 import numpy as np
@@ -10,6 +11,7 @@ from tqdm import tqdm
 
 from thz_deconvolution import Deconvolution
 from envelope import gaussian_kernel1d, convolve1d, envelope_hilbert
+from estimate_noise import get_threshold_from_noise, fit_gmm_and_get_noise_threshold
 
 
 def get_dynamic_range(data, percentile=0.999):
@@ -251,6 +253,7 @@ def detect_first_peak(t, signal, height=5):
 
     return t[first_peak_index]
 
+
 def get_thickness(t1, t2, angle=19):
     l = 6 * 25.4 / 1000
     delta_t = np.abs(t2 - t1) * 1e-12
@@ -343,16 +346,27 @@ def save_surface_as_point_cloud(surface, x_max, x_min, y_max, y_min, filename, f
     return x_points, y_points, z_points
 
 
+def get_thz_file_from_path(path: Path):
+    for file in os.listdir(path):
+        if file.endswith("_data.thz"):
+            return path.joinpath(file)
+
+
 if __name__ == '__main__':
 
-    path = Path("/Users/linus/Documents/COC_terrain/data_image_rfl/1758834352.9015865_data.thz")
-    # path = Path("/Users/linus/Documents/COC_SPHERES_fine_scan/data_image_rfl/1759959272.6226816_data.thz")
-    # path = Path("/Users/linus/Documents/COC_SPHERES_fine_scan_3/data_image_rfl/1760820898.0132043_data.thz")
-    # path = Path("/Users/linus/Documents/COC_FULL_SPHERES_fine_scan/data_image_rfl/1760023882.972197_data.thz")
-    # path = Path("/Users/linus/Documents/resolution_scan_A_high_res_6/data_image_rfl/1760606720.3549016_data.thz")
-    # path = Path("/Users/linus/Documents/COC_SPHERES_ext_rng/data_image_rfl/1744835132.148543_data.thz")
-    path = Path("/Users/linus/Documents/COC_terrain_res_target_2/data_image_rfl/1759921401.9838753_data.thz")
-    path = Path("/Users/linus/Documents/DUST_surface_res_target_3d_3/data_image_rfl/1760633536.387254_data.thz")
+    path = Path("/Users/linus/Documents/COC_terrain/data_image_rfl")
+    # path = Path("/Users/linus/Documents/COC_SPHERES_fine_scan/data_image_rfl")
+    # path = Path("/Users/linus/Documents/COC_SPHERES_fine_scan_3/data_image_rfl")
+    # path = Path("/Users/linus/Documents/COC_FULL_SPHERES_fine_scan/data_image_rfl")
+    # path = Path("/Users/linus/Documents/resolution_scan_A_high_res_6/data_image_rfl")
+    # path = Path("/Users/linus/Documents/COC_SPHERES_ext_rng/data_image_rfl")
+    path = Path("/Users/linus/Documents/COC_terrain_res_target_2/data_image_rfl")
+    # path = Path("/Users/linus/Documents/DUST_surface_res_target_3d_3/data_image_rfl")
+    # path = Path("/Users/linus/Documents/COC_PEBBLE_CoDA_T1a_2/data_image_rfl")
+    # path = Path("/Users/linus/Documents/Solid_ICE_PEBBLE_CoDA_T1a_2/data_image_rfl")
+    # path = Path("/Users/linus/Documents/SPIPA_ICE_PEBBLE_CoDA_T1a_2/data_image_rfl")
+
+    path = get_thz_file_from_path(path)
 
     with DotthzFile(path) as psf_data:
         key = list(psf_data.keys())[0]
@@ -385,8 +399,8 @@ if __name__ == '__main__':
     p = traces[::, ::, times < 1912]
     t = times[times < 1912]
 
-    #p = traces[::, ::, :]
-    #t = times[:]
+    # p = traces[::, ::, :]
+    # t = times[:]
 
     # p = p[p.shape[0]//2-10:p.shape[0]//2+10, ::2, :]
     # x_min = -5
@@ -413,8 +427,11 @@ if __name__ == '__main__':
             noise_mean = np.mean(np.abs(convolved_data[:60]))
             noise_std = np.std(np.abs(convolved_data[:60]))
 
-            threshold = noise_mean + 15.0 * noise_std
-            threshold = 0.4 + convolved_data[0]
+            threshold = noise_mean + 10.0 * noise_std
+            # threshold = get_threshold_from_noise(convolved_data)
+            threshold, components = fit_gmm_and_get_noise_threshold(convolved_data, n_components=3, plot=False)
+
+            # threshold = 0.2 + convolved_data[0]
 
             t1 = detect_first_peak(time, convolved_data, height=threshold)
             t1h = detect_first_peak(time, convolved_data_h, height=threshold)
@@ -424,21 +441,24 @@ if __name__ == '__main__':
             # if x == 0 and y == 0:
             #     plt.plot(1000 * (time - time[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12,
             #              convolved_data )
-            if x == 21 and y == 138:
-                plt.title(f"Pixel ({x}, {y})")
-                plt.plot(1000 * (time - time[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12,
-                         pulse/np.max(pulse))
-                plt.plot(1000 * (time - time[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12,
-                         convolved_data ,ls="--")
-                plt.plot(1000 * (time - time[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12,
-                         convolved_data_h,ls="--")
-                plt.axhline(threshold, color='blue', label='threshold')
-                plt.axhline(noise_mean, color='red', label='noise mean')
-                plt.axvline(1000 * (time[60] - time[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12, color='black',label='noise gate')
-                plt.axvline(1000 * (t1 - time[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12, color='orange',label='t1')
-                plt.axvline(1000 * (t1h - time[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12, color='green',ls="--",label="Hilbert peak")
-                plt.legend()
-                plt.show()
+            # if x == 21 and y == 22:
+            #     plt.title(f"Pixel ({x}, {y})")
+            #     plt.plot(1000 * (time - time[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12,
+            #              pulse)
+            #     plt.plot(1000 * (time - time[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12,
+            #              convolved_data, ls="--")
+            #     # plt.plot(1000 * (time - time[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12,
+            #     #          convolved_data_h, ls="--")
+            #     plt.axhline(threshold, color='blue', label='threshold')
+            #     plt.axhline(noise_mean, color='red', label='noise mean')
+            #     plt.axvline(1000 * (time[60] - time[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12,
+            #                 color='black', label='noise gate')
+            #     plt.axvline(1000 * (t1 - time[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12,
+            #                 color='orange', label='t1')
+            #     # plt.axvline(1000 * (t1h - time[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12,
+            #     #             color='green', ls="--", label="Hilbert peak")
+            #     plt.legend()
+            #     plt.show()
 
             if t1 is None:
                 t1 = t[-1]
@@ -496,7 +516,7 @@ if __name__ == '__main__':
     #             surface[x, y] = get_thickness(t1, 0) * 1000  # in mm
 
     save_surface_as_point_cloud(surface, x_max, x_min, y_max, y_min,
-                                "extracted_surface_dust_res_target_pointcloud.ply", format='ply')
+                                path.with_suffix(".ply"), format='ply')
 
     # Plot the surface as a 3D mesh
     fig = plt.figure()

@@ -55,7 +55,7 @@ def convolve1d(data: np.ndarray, kernel: np.ndarray) -> np.ndarray:
     Drop-in replacement for the original manual loop implementation.
     """
     output = convolve(data, kernel, mode='same')
-    return output / np.max(output)
+    return output # / np.max(output)
 
 
 
