@@ -1,3 +1,6 @@
 [submodule "thz-analysis"]
 	path = thz-analysis
 	url = git@spacegit.unibe.ch:SUBICE/data-analysis/thz-analysis
+[submodule "pyhelper"]
+	path = pyhelper
+	url = https://github.com/hacknus/pyhelper
