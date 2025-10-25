@@ -50,7 +50,7 @@ class NoiseEstimator:
         self.n_components = n_components
         self.gmm = GaussianMixture(n_components=n_components, covariance_type='full', random_state=42, verbose=False)
 
-    def fit_gmm_and_get_noise_threshold(self, data, std_multiplier=5, plot=False, combined_plot=False):
+    def fit_gmm_and_get_noise_threshold(self, data, std_multiplier=1, plot=False, combined_plot=False):
         data = np.asarray(data)
         data = data[np.isfinite(data) & (data > 0)]  # only positive, finite values
         data_reshaped = data.reshape(-1, 1)  # GMM expects 2D input
@@ -70,10 +70,9 @@ class NoiseEstimator:
         weights = weights[sorted_indices]
 
         # Assume first component is noise
-        mu_noise = means[0]
-        sigma_noise = stds[0]
+        mu_noise = means[1]
+        sigma_noise = stds[1]
         threshold = mu_noise + std_multiplier * sigma_noise
-
         if plot:
             # Plot histogram
             counts, bins, _ = plt.hist(data, bins=50, density=True, alpha=0.2, color='black', edgecolor='black')
@@ -122,11 +121,19 @@ class NoiseEstimator:
                 y = weight * (1 / (std * np.sqrt(2 * np.pi))) * np.exp(-(x.flatten() - mean) ** 2 / (2 * std ** 2))
                 if i == 0:
                     axes[1].plot(y, x, color=unibe.BLUE, ls="-", label=f'Primary')
-                    axes[1].axhline(threshold, color=unibe.RED, linestyle='--', label=r'$I_\text{th}$')
-                    axes[1].axhline(mean, color=unibe.ORANGE, linestyle='--', label="$L$")
-                    axes[0].axhline(mean, color=unibe.ORANGE, linestyle='--', label="Noise Level $L$")
                 else:
-                    axes[1].plot(y, x, color=unibe.BLUE, ls="--")
+                    axes[1].plot(y, x, color=unibe.BLUE, ls="--", label=f'Secondary')
+
+            for i in range(self.n_components):
+                mean = means[i]
+                std = stds[i]
+                weight = weights[i]
+                y = weight * (1 / (std * np.sqrt(2 * np.pi))) * np.exp(-(x.flatten() - mean) ** 2 / (2 * std ** 2))
+                if i == 0:
+                    axes[1].axhline(threshold, color=unibe.RED, linestyle='--', label=r'$I_\text{th}$')
+                    # axes[1].axhline(mean, color=unibe.ORANGE, linestyle='--', label="$L$")
+                    # axes[0].axhline(mean, color=unibe.ORANGE, linestyle='--', label="Noise Level $L$")
+
 
 
             axes[0].legend()
@@ -146,8 +153,9 @@ class NoiseEstimator:
 
 if __name__ == "__main__":
     path = Path("/Users/linus/Documents/COC_PEBBLE_CoDA_T1a_2/data_image_rfl")
-    # path = Path("/Users/linus/Documents/COC_SPHERES_fine_scan_3/data_image_rfl")
+    path = Path("/Users/linus/Documents/COC_SPHERES_fine_scan_3/data_image_rfl")
     path = Path("/Users/linus/Documents/DUST_surface_res_target_3d_4/data_image_rfl")
+    # path = Path("/Users/linus/Documents/COC_terrain_res_target_4c/data_image_rfl")
 
     path = get_thz_file_from_path(path)
 
@@ -181,7 +189,7 @@ if __name__ == "__main__":
 
     p = traces[::, ::, times < 1912]
     t = times[times < 1912]
-    x = 60
+    x = 50
     y = 66
     time, pulse = t, p[x, y, :]
 
@@ -189,8 +197,8 @@ if __name__ == "__main__":
 
     convolved_data = convolve1d(np.abs(pulse), kernel)
 
-    Gmm = NoiseEstimator(n_components=3)
-    threshold, components = Gmm.fit_gmm_and_get_noise_threshold(convolved_data, std_multiplier=6, combined_plot=True)
+    Gmm = NoiseEstimator(n_components=2)
+    threshold, components = Gmm.fit_gmm_and_get_noise_threshold(convolved_data, std_multiplier=1, combined_plot=True)
 
     # plt.plot(time, pulse, color="black", alpha=0.25, label="Pulse, Band-Pass")
     # plt.plot(time, convolved_data, color=unibe.BLUE, label="Gaussian Convolution")
