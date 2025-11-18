@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from typing import Optional
 
 import numpy as np
 from matplotlib import pyplot as plt
@@ -350,6 +351,147 @@ def get_thz_file_from_path(path: Path):
     for file in os.listdir(path):
         if file.endswith("_data.thz"):
             return path.joinpath(file)
+
+
+def extract_surface(times, traces,  x_min, x_max, width, y_min, y_max, height, path: Optional[Path] = None, t_cutoff=1912):
+    traces = traces[::, ::, :]
+
+    # Decon = Deconvolution(psf_path=Path("psf_data/psf.npz"), low_cut=0.1, high_cut=5.0)
+    Decon = Deconvolution(
+        knife_edge_x_path=Path("psf_data/example_beam_width/measurement_x/data/1750085285.8557956_data.thz"),
+        knife_edge_y_path=Path("psf_data/example_beam_width/measurement_y/data/1750163177.929295_data.thz"),
+        low_cut=1.0, high_cut=5.0)
+
+    deconvolved_traces = Decon.apply_deconvolution(traces, x_min, x_max, width, y_min, y_max, height, max_iter=100)
+    traces = deconvolved_traces
+
+    p = traces[::, ::, times < t_cutoff]
+    t = times[times < t_cutoff]
+
+    # p = traces[::, ::, :]
+    # t = times[:]
+
+    # p = p[p.shape[0]//2-10:p.shape[0]//2+10, ::2, :]
+    # x_min = -5
+    # x_max = 5
+    surface = np.zeros(p.shape[:2])
+    kernel = gaussian_kernel1d(sigma=6.0, radius=18)
+
+    Gmm = NoiseEstimator(n_components=2)
+
+    for x in tqdm(range(p.shape[0])):
+        for y in range(p.shape[1]):
+
+            # f, a, arg = get_fft(t, p[x, y, :])
+            #
+            # a[f < 1.0] = 0
+            # a[f > 5.0] = 0
+            #
+            # time, pulse = get_ifft(f, a, arg, t0=t[0])
+
+            time, pulse = t, p[x, y, :]
+
+            # t1 = detect_first_zero_crossing_after_peak(time, pulse, height=1.2)
+
+            convolved_data_h = envelope_hilbert(pulse)
+            convolved_data = convolve1d(np.abs(pulse), kernel)
+
+            noise_mean = np.mean(np.abs(convolved_data[:60]))
+            noise_std = np.std(np.abs(convolved_data[:60]))
+
+            threshold = noise_mean + 10.0 * noise_std
+            # threshold = get_threshold_from_noise(convolved_data)
+            threshold, components = Gmm.fit_gmm_and_get_noise_threshold(convolved_data, plot=False)
+
+            # threshold = 0.2 + convolved_data[0]
+
+            t1 = detect_first_peak(time, convolved_data, height=threshold)
+            t1h = detect_first_peak(time, convolved_data_h, height=threshold)
+
+            # threshold = 0.08
+            #
+            # if x == 0 and y == 0:
+            #     plt.plot(1000 * (time - time[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12,
+            #              convolved_data )
+            # if x == 21 and y == 22:
+            #     plt.title(f"Pixel ({x}, {y})")
+            #     plt.plot(1000 * (time - time[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12,
+            #              pulse)
+            #     plt.plot(1000 * (time - time[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12,
+            #              convolved_data, ls="--")
+            #     # plt.plot(1000 * (time - time[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12,
+            #     #          convolved_data_h, ls="--")
+            #     plt.axhline(threshold, color='blue', label='threshold')
+            #     plt.axhline(noise_mean, color='red', label='noise mean')
+            #     plt.axvline(1000 * (time[60] - time[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12,
+            #                 color='black', label='noise gate')
+            #     plt.axvline(1000 * (t1 - time[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12,
+            #                 color='orange', label='t1')
+            #     # plt.axvline(1000 * (t1h - time[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12,
+            #     #             color='green', ls="--", label="Hilbert peak")
+            #     plt.legend()
+            #     plt.show()
+
+            if t1 is None:
+                t1 = t[-1]
+                # plt.title(f"Pixel ({x}, {y})")
+                # plt.plot(1000 * (time - time[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12,
+                #          pulse / np.max(pulse))
+                # plt.plot(1000 * (time - time[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12,
+                #          convolved_data, ls="--")
+                # plt.plot(1000 * (time - time[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12,
+                #          convolved_data_h, ls="--")
+                # plt.axhline(threshold, color='k')
+                # plt.axhline(noise_mean, color='red')
+                # plt.axvline(1000 * (time[60] - time[0]) * scipy.constants.c / np.cos(np.radians(19)) / 2 * 1e-12,
+                #             color='black')
+                #
+                # plt.show()
+                # if y > 0:
+                #     surface[x, y] = surface[x, y - 1]
+                # else:
+                #     surface[x, y] = surface[x - 1, y]
+                surface[x, y] = - get_thickness(t[0], t1) * 1000  # in mm
+
+            else:
+                surface[x, y] = - get_thickness(t[0], t1) * 1000  # in mm
+
+    # # Initialize arrays to store multiple peak candidates
+    # max_candidates = 2
+    # surface_candidates = np.zeros((p.shape[0], p.shape[1], max_candidates))
+    #
+    # for x in range(p.shape[0]):
+    #     for y in range(p.shape[1]):
+    #         f, a, arg = get_fft(t, p[x, y, :])
+    #         a[f < 0.1] = 0
+    #         time, pulse = get_ifft(f, a, arg, t0=t[0])
+    #
+    #         # Detect first two peaks with their zero crossings
+    #         peak_results = detect_first_two_peaks_with_zero_crossings(time, pulse, height=2)
+    #
+    #         # Store candidates (use zero crossing times)
+    #         for i, (peak_time, zero_crossing_time) in enumerate(peak_results):
+    #             if i < max_candidates:
+    #                 surface_candidates[x, y, i] = zero_crossing_time
+    #
+    # # Apply neighborhood-based smoothing to select best peaks
+    # surface_raw = smooth_peak_selection(surface_candidates, neighborhood_size=3, max_deviation_factor=1)
+    #
+    # # Convert to thickness
+    # surface = np.zeros_like(surface_raw)
+    # for x in range(surface_raw.shape[0]):
+    #     for y in range(surface_raw.shape[1]):
+    #         t1 = surface_raw[x, y]
+    #         if t1 == 0:
+    #             surface[x, y] = 0
+    #         else:
+    #             surface[x, y] = get_thickness(t1, 0) * 1000  # in mm
+
+    if path is not None:
+        save_surface_as_point_cloud(surface, x_max, x_min, y_max, y_min,
+                                    path.with_suffix(".ply"), format='ply')
+
+    return surface
 
 
 if __name__ == '__main__':
