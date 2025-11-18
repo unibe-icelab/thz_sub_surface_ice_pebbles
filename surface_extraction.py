@@ -11,7 +11,7 @@ from tqdm import tqdm
 
 from thz_deconvolution import Deconvolution
 from envelope import gaussian_kernel1d, convolve1d, envelope_hilbert
-from estimate_noise import get_threshold_from_noise, fit_gmm_and_get_noise_threshold
+from estimate_noise import NoiseEstimator
 
 
 def get_dynamic_range(data, percentile=0.999):
@@ -407,6 +407,9 @@ if __name__ == '__main__':
     # x_max = 5
     surface = np.zeros(p.shape[:2])
     kernel = gaussian_kernel1d(sigma=6.0, radius=18)
+
+    Gmm = NoiseEstimator(n_components=2)
+
     for x in tqdm(range(p.shape[0])):
         for y in range(p.shape[1]):
 
@@ -429,7 +432,7 @@ if __name__ == '__main__':
 
             threshold = noise_mean + 10.0 * noise_std
             # threshold = get_threshold_from_noise(convolved_data)
-            threshold, components = fit_gmm_and_get_noise_threshold(convolved_data, n_components=3, plot=False)
+            threshold, components = Gmm.fit_gmm_and_get_noise_threshold(convolved_data, plot=False)
 
             # threshold = 0.2 + convolved_data[0]
 

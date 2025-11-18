@@ -50,7 +50,97 @@ class NoiseEstimator:
         self.n_components = n_components
         self.gmm = GaussianMixture(n_components=n_components, covariance_type='full', random_state=42, verbose=False)
 
-    def fit_gmm_and_get_noise_threshold(self, data, std_multiplier=1, plot=False, combined_plot=False):
+    def fit_lnmm_and_get_noise_threshold(
+            self, data, time=None, pulse=None,
+            std_multiplier=3, plot=False, combined_plot=False
+    ):
+        data = np.asarray(data)
+        convolved_data = data
+        data = data[np.isfinite(data) & (data > 0)]
+
+        # Log-transform
+        log_data = np.log(data).reshape(-1, 1)
+        self.gmm.fit(log_data)
+
+        # Extract log-space Gaussian parameters
+        log_means = self.gmm.means_.flatten()
+        log_stds = np.sqrt(np.array([np.diag(cov) for cov in self.gmm.covariances_])).flatten()
+        weights = self.gmm.weights_
+
+        # Sort by mean (first = noise)
+        idx = np.argsort(log_means)
+        log_means, log_stds, weights = log_means[idx], log_stds[idx], weights[idx]
+
+        mu_n, sigma_n = log_means[0], log_stds[0]
+        log_thresh = mu_n + std_multiplier * sigma_n
+        # threshold = np.exp(log_thresh)
+        # threshold = (np.exp(log_means[0]) + np.exp(log_means[1])) / 2
+        # threshold = np.exp(log_means[1] + log_stds[1])
+        threshold = np.exp(log_means[1] + 0.5 * log_stds[1] ** 2)
+
+        # Optional: Simple plotting
+        if plot:
+            x = np.linspace(0, np.max(data), 1000)
+            log_x = np.log(x + 1e-12)
+
+            plt.hist(data, bins=60, density=True, alpha=0.25, edgecolor='black', label="Data")
+
+            for i in range(self.n_components):
+                mu, sigma, w = log_means[i], log_stds[i], weights[i]
+                y = w * (1 / (x * sigma * np.sqrt(2 * np.pi))) * np.exp(-(log_x - mu) ** 2 / (2 * sigma ** 2))
+                plt.plot(x, y, '--' if i > 0 else '-', label=f'LN Comp. {i + 1}')
+
+            plt.axvline(threshold, color='r', linestyle='--', label="Threshold")
+            plt.xlabel("Signal Amplitude")
+            plt.ylabel("Density")
+            plt.legend()
+            plt.tight_layout()
+            plt.show()
+
+        # Combined plot view: pulse + histogram + LNMM model
+        if combined_plot and time is not None and pulse is not None and convolved_data is not None:
+
+            mu_1 = np.exp(log_means[1])
+
+            fig, axes = plt.subplots(ncols=2, figsize=(12, 6), gridspec_kw={'width_ratios': [4, 1.1]}, sharey=True)
+
+            # Time-domain signal view
+            axes[0].plot(time, pulse, color="black", alpha=0.25, label="Pulse (band-pass)")
+            axes[0].plot(time, convolved_data, color=unibe.BLUE, label="Envelope")
+            axes[0].axhline(threshold, color=unibe.RED, ls='--', label='Threshold')
+            axes[0].set_xlabel("Time [ps]")
+            axes[0].set_ylabel("Amplitude")
+            axes[0].legend()
+
+            # Histogram view
+            counts, bins, _ = axes[1].hist(
+                data, orientation="horizontal", bins=50,
+                density=True, alpha=0.2, edgecolor='black'
+            )
+
+            # axes[1].set_xlim(axes[1].get_xlim()[::-1])
+
+            x = np.linspace(0, np.max(data), 1000)
+            log_x = np.log(x + 1e-12)
+
+            for i in range(self.n_components):
+                mu, sigma, w = log_means[i], log_stds[i], weights[i]
+                y = w * (1 / (x * sigma * np.sqrt(2 * np.pi))) * np.exp(-(log_x - mu) ** 2 / (2 * sigma ** 2))
+                axes[1].plot(y, x, '--' if i > 0 else '-', color=unibe.BLUE, label=f'LN Comp. {i + 1}')
+
+            axes[1].axhline(threshold, color=unibe.RED, linestyle='--', label="Threshold")
+            axes[1].set_xlabel("Density")
+            axes[1].legend()
+
+            plt.tight_layout()
+            plt.savefig('noise_LNM_fit.pdf')
+            plt.savefig('noise_LNM_fit.png')
+            plt.show()
+
+        return threshold, (log_means, log_stds, weights)
+
+    def fit_gmm_and_get_noise_threshold(self, data, std_multiplier=1, dynamic_range_offset=0.1, plot=False,
+                                        combined_plot=False):
         data = np.asarray(data)
         data = data[np.isfinite(data) & (data > 0)]  # only positive, finite values
         data_reshaped = data.reshape(-1, 1)  # GMM expects 2D input
@@ -70,9 +160,14 @@ class NoiseEstimator:
         weights = weights[sorted_indices]
 
         # Assume first component is noise
-        mu_noise = means[1]
-        sigma_noise = stds[1]
+        mu_noise = means[0]
+        sigma_noise = stds[0]
         threshold = mu_noise + std_multiplier * sigma_noise
+
+        threshold += dynamic_range_offset * (np.max(data) - np.min(data))
+
+        # threshold = (means[0] + means[1]) / 2
+
         if plot:
             # Plot histogram
             counts, bins, _ = plt.hist(data, bins=50, density=True, alpha=0.2, color='black', edgecolor='black')
@@ -86,11 +181,11 @@ class NoiseEstimator:
                 y = weight * (1 / (std * np.sqrt(2 * np.pi))) * np.exp(-(x.flatten() - mean) ** 2 / (2 * std ** 2))
                 if i == 0:
                     plt.plot(x, y, color=unibe.BLUE, ls="-", label=f'Primary Gaussian')
-                    plt.axvline(x=mean, color=unibe.ORANGE, linestyle='--', label="Noise Level $L$")
+                    plt.axvline(x=mean, color=unibe.ORANGE, linestyle='--', label=r"$\mu_1$")
                 else:
                     plt.plot(x, y, color=unibe.BLUE, ls="--")
 
-            plt.axvline(threshold, color=unibe.RED, linestyle='--', label=f'Threshold $I_\text{th}$')
+            plt.axvline(threshold, color=unibe.RED, linestyle='--', label=r'$I_\text{th}$')
             plt.xlabel('Signal [nA]')
             plt.ylabel('Density')
             plt.legend()
@@ -131,10 +226,8 @@ class NoiseEstimator:
                 y = weight * (1 / (std * np.sqrt(2 * np.pi))) * np.exp(-(x.flatten() - mean) ** 2 / (2 * std ** 2))
                 if i == 0:
                     axes[1].axhline(threshold, color=unibe.RED, linestyle='--', label=r'$I_\text{th}$')
-                    # axes[1].axhline(mean, color=unibe.ORANGE, linestyle='--', label="$L$")
-                    # axes[0].axhline(mean, color=unibe.ORANGE, linestyle='--', label="Noise Level $L$")
-
-
+                    axes[1].axhline(mean, color=unibe.ORANGE, linestyle='--', label=r"$\mu_1$")
+                    axes[0].axhline(mean, color=unibe.ORANGE, linestyle='--', label=r"$\mu_1$")
 
             axes[0].legend()
             axes[0].set_xlabel("Time [ps]")
@@ -156,6 +249,7 @@ if __name__ == "__main__":
     path = Path("/Users/linus/Documents/COC_SPHERES_fine_scan_3/data_image_rfl")
     path = Path("/Users/linus/Documents/DUST_surface_res_target_3d_4/data_image_rfl")
     # path = Path("/Users/linus/Documents/COC_terrain_res_target_4c/data_image_rfl")
+    # path = Path("/Users/linus/Documents/COC_terrain_res_target_5_c_coarse/data_image_rfl")
 
     path = get_thz_file_from_path(path)
 
@@ -189,6 +283,9 @@ if __name__ == "__main__":
 
     p = traces[::, ::, times < 1912]
     t = times[times < 1912]
+
+    p = traces[::, ::, :]
+    t = times[:]
     x = 50
     y = 66
     time, pulse = t, p[x, y, :]
@@ -198,7 +295,8 @@ if __name__ == "__main__":
     convolved_data = convolve1d(np.abs(pulse), kernel)
 
     Gmm = NoiseEstimator(n_components=2)
-    threshold, components = Gmm.fit_gmm_and_get_noise_threshold(convolved_data, std_multiplier=1, combined_plot=True)
+    threshold, components = Gmm.fit_lnmm_and_get_noise_threshold(convolved_data, time=time, pulse=pulse,
+                                                                 std_multiplier=1, combined_plot=True)
 
     # plt.plot(time, pulse, color="black", alpha=0.25, label="Pulse, Band-Pass")
     # plt.plot(time, convolved_data, color=unibe.BLUE, label="Gaussian Convolution")
