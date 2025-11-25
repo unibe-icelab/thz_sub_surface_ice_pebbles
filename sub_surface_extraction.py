@@ -88,27 +88,9 @@ def extract_pebble(times, traces, dx, dy, x_min, x_max, width, y_min, y_max, hei
         n_filters=n_filters,
         w_max=w_max)
 
-    deconvolved_traces = Decon.apply_deconvolution(traces, x_min, x_max, width, y_min, y_max, height, max_iter=100)
-    traces = deconvolved_traces
-
-    traces = traces[::, ::, :]
-    times = times[:]
-
-    os.makedirs(output_path, exist_ok=True)
-
     w, h, d = traces.shape
     d_scan = traces[:, w // 2 - 10, :]
     b_scan = traces[h // 2, :, :]
-    surface_b_scan = surface[h // 2, :]
-
-    b_scan_convolved = np.zeros_like(b_scan)
-
-    kernel = gaussian_kernel1d(sigma=sigma, radius=sigma * 3)
-
-    for x in tqdm(range(traces.shape[0])):
-        convolved_data = convolve1d(np.abs(b_scan[x, :]), kernel)
-        b_scan_convolved[x] = convolved_data
-        # b_scan_convolved[x] = scipy.signal.hilbert(np.abs(b_scan[x])**0.5).imag
 
     spacing_x = dx
     spacing_y = dy
@@ -116,8 +98,8 @@ def extract_pebble(times, traces, dx, dy, x_min, x_max, width, y_min, y_max, hei
     spacing_z = -(get_thickness(times[0], times[1]) * 1000) / n_dust
 
     # Plot using imshow with the calculated extent
-    iamge = b_scan_convolved
-    image = iamge.T
+    image = np.abs(b_scan)
+    image = image.T
 
     extent = [0, b_scan.shape[0] * spacing_x, b_scan.shape[1] * spacing_z, 0]
 
@@ -136,6 +118,27 @@ def extract_pebble(times, traces, dx, dy, x_min, x_max, width, y_min, y_max, hei
         plt.savefig(output_path.joinpath(f"{filename}_raw_b_scan.png"), dpi=300)
         plt.savefig(output_path.joinpath(f"{filename}_raw_b_scan.pdf"))
         plt.show()
+
+    deconvolved_traces = Decon.apply_deconvolution(traces, x_min, x_max, width, y_min, y_max, height, max_iter=100)
+    traces = deconvolved_traces
+
+    traces = traces[::, ::, :]
+    times = times[:]
+
+    os.makedirs(output_path, exist_ok=True)
+
+    surface_b_scan = surface[h // 2, :]
+
+
+    b_scan_convolved = np.zeros_like(b_scan)
+
+    kernel = gaussian_kernel1d(sigma=sigma, radius=sigma * 3)
+
+    for x in tqdm(range(traces.shape[0])):
+        convolved_data = convolve1d(np.abs(b_scan[x, :]), kernel)
+        b_scan_convolved[x] = convolved_data
+        # b_scan_convolved[x] = scipy.signal.hilbert(np.abs(b_scan[x])**0.5).imag
+
 
     # -------------
     # 3D Processing

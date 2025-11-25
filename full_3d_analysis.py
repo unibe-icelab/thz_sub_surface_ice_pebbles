@@ -40,12 +40,12 @@ if __name__ == "__main__":
     #     "/Users/linus/Documents/ICE_PEBBLE_SPHERE_CoDA_T3_dust_low_res_vac_10_fast_focus_on_sphere_top/data_image_rfl")
 
     # # SPIPA B, high res, 34 deg phase angle
-    # path = Path(
-    #    "/Users/linus/Documents/ICE_PEBBLE_SPHERE_CoDA_T3_dust_high_res_vac_10_fast_focus_on_sphere_top/data_image_rfl")
+    path = Path(
+       "/Users/linus/Documents/ICE_PEBBLE_SPHERE_CoDA_T3_dust_high_res_vac_10_fast_focus_on_sphere_top/data_image_rfl")
 
     # # empty control, low res, 34 deg phase angle
-    # path = Path(
-    #      "/Users/linus/Documents/CONTROL_CoDA_T3_dust_low_res_vac_11_fast_focus_on_sphere_top/data_image_rfl")
+    path = Path(
+         "/Users/linus/Documents/CONTROL_CoDA_T3_dust_low_res_vac_11_fast_focus_on_sphere_top/data_image_rfl")
 
     path = get_thz_file_from_path(path)
 
