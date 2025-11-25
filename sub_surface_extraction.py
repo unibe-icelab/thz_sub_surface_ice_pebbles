@@ -4,6 +4,8 @@ from pathlib import Path
 import numpy as np
 from cmcrameri import cm
 from matplotlib import pyplot as plt
+from matplotlib.patches import Rectangle
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 from pydotthz import DotthzFile
 from scipy.ndimage import zoom, gaussian_filter
 from scipy.signal import fftconvolve
@@ -19,6 +21,32 @@ from surface_extraction import get_thz_file_from_path
 
 import plotly.graph_objects as go
 
+params = {"ytick.color":
+              "black",
+
+          "xtick.color":
+              "black",
+
+          "axes.labelcolor":
+              "black",
+
+          "axes.edgecolor":
+              "black",
+
+          "mathtext.fontset":
+              "cm",
+
+          "mathtext.rm":
+              "Times New Roman",
+
+          "font.family":
+              "Helvetica Neue",
+
+          "font.size":
+              24}
+
+plt.rcParams.update(params)
+
 
 def get_scaled_ball_kernel(radius, downsample_x, downsample_y, downsample_z):
     downsample_factor = max(downsample_x, downsample_y, downsample_z)
@@ -29,7 +57,14 @@ def get_scaled_ball_kernel(radius, downsample_x, downsample_y, downsample_z):
 
 def extract_pebble(times, traces, dx, dy, x_min, x_max, width, y_min, y_max, height, output_path: Path,
                    filename: str,
-                   n_dust: float = 1.5,
+                   n_dust: float = 1.0,
+                   low_cut=0.2,
+                   high_cut=0.5,
+                   start_freq=0.2,
+                   end_freq=0.5,
+                   win_width=0.5,
+                   n_filters=20,
+                   w_max=30,
                    z_range=[5, 20],
                    sigma=6,
                    power=1.0,
@@ -37,16 +72,21 @@ def extract_pebble(times, traces, dx, dy, x_min, x_max, width, y_min, y_max, hei
                    threshold=0.15 ** 1,
                    sigma_smooth=2.0,
                    mask_threshold=0.5,
-                   plot_a_scan: bool = False,
-                   plot_b_scan: bool = True
+                   plot_b_scan: bool = True,
+                   surface=None,
+                   rim_width_l=5,  # mm
+                   rim_width_r=5  # mm
                    ):
-    low_cut = 0.2
-    high_cut = 0.5
-
     Decon = Deconvolution(
         knife_edge_x_path=Path("psf_data/example_beam_width/measurement_x/data/1750085285.8557956_data.thz"),
         knife_edge_y_path=Path("psf_data/example_beam_width/measurement_y/data/1750163177.929295_data.thz"),
-        low_cut=low_cut, high_cut=high_cut, start_freq=low_cut, end_freq=high_cut)
+        low_cut=low_cut,
+        high_cut=high_cut,
+        start_freq=start_freq,
+        end_freq=end_freq,
+        win_width=win_width,
+        n_filters=n_filters,
+        w_max=w_max)
 
     deconvolved_traces = Decon.apply_deconvolution(traces, x_min, x_max, width, y_min, y_max, height, max_iter=100)
     traces = deconvolved_traces
@@ -57,8 +97,9 @@ def extract_pebble(times, traces, dx, dy, x_min, x_max, width, y_min, y_max, hei
     os.makedirs(output_path, exist_ok=True)
 
     w, h, d = traces.shape
-    a_scan = traces[:, w // 2 - 10, :]
+    d_scan = traces[:, w // 2 - 10, :]
     b_scan = traces[h // 2, :, :]
+    surface_b_scan = surface[h // 2, :]
 
     b_scan_convolved = np.zeros_like(b_scan)
 
@@ -81,13 +122,19 @@ def extract_pebble(times, traces, dx, dy, x_min, x_max, width, y_min, y_max, hei
     extent = [0, b_scan.shape[0] * spacing_x, b_scan.shape[1] * spacing_z, 0]
 
     if plot_b_scan:
-        plt.figure(figsize=(8, 6))
-        plt.ylabel("Depth (mm)")
-        plt.imshow(image, extent=extent, aspect='1', norm="log", cmap=cm.berlin)
-        plt.xlabel("Width (mm)")
-        plt.title("Raw B-Scan")
-        plt.colorbar(label="Intensity")
-        plt.savefig(output_path.joinpath(f"{filename}_raw_a_scan.png"), dpi=300)
+        fig, ax = plt.subplots(figsize=(12, 8))
+        ax.set_ylabel("OPL (Depth) [mm]")
+        im = ax.imshow(image, extent=extent, aspect='1', norm="log", cmap=cm.vik)
+        ax.set_xlabel("Width [mm]")
+        # ax.set_title("Raw B-Scan")
+
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="5%", pad=0.5)
+        cbar = fig.colorbar(im, cax=cax)
+        cbar.set_label("Intensity [a.u.]")
+
+        plt.savefig(output_path.joinpath(f"{filename}_raw_b_scan.png"), dpi=300)
+        plt.savefig(output_path.joinpath(f"{filename}_raw_b_scan.pdf"))
         plt.show()
 
     # -------------
@@ -130,14 +177,34 @@ def extract_pebble(times, traces, dx, dy, x_min, x_max, width, y_min, y_max, hei
     b_scan_downsampled = image_downsampled[:, w // 2 - 10, :]
     extent = [0, b_scan_downsampled.shape[0] * spacing_x_down, b_scan_downsampled.shape[1] * spacing_z_down, 0]
 
+    # Overlay white rectangles on left and right 10mm
+    height_mm = b_scan.shape[1] * spacing_z
+
     if plot_b_scan:
-        plt.figure(figsize=(8, 6))
-        plt.ylabel("Depth (mm)")
-        plt.imshow(b_scan_downsampled.T, extent=extent, aspect='1', norm="log", cmap=cm.berlin)
-        plt.xlabel("Width (mm)")
-        plt.title("Filtered B-Scan)")
-        plt.colorbar(label="Intensity")
+        fig, ax = plt.subplots(figsize=(12, 8))
+        ax.set_ylabel("OPL (Depth) [mm]")
+        im = ax.imshow(b_scan_downsampled.T, extent=extent, aspect='1', norm="log", cmap=cm.vik)
+        ax.set_xlabel("Width [mm]")
+        # ax.set_title("Filtered B-Scan")
+
+        if surface is not None:
+            x = np.linspace(0, b_scan.shape[0] * spacing_x, b_scan.shape[0])
+            ax.plot(x, surface_b_scan, color="black", linewidth=4)
+
+        # Left rectangle
+        ax.add_patch(Rectangle((0, 0), rim_width_l, height_mm, color='white', zorder=2, alpha=0.7))
+        # Right rectangle
+        ax.add_patch(
+            Rectangle((b_scan.shape[0] * spacing_x - rim_width_r, 0), rim_width_r, height_mm, color='white', zorder=2,
+                      alpha=0.7))
+
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="5%", pad=0.5)
+        cbar = fig.colorbar(im, cax=cax)
+        cbar.set_label("Intensity [a.u.]")
+
         plt.savefig(output_path.joinpath(f"{filename}_filtered_b_scan.png"), dpi=300)
+        plt.savefig(output_path.joinpath(f"{filename}_filtered_b_scan.pdf"))
         plt.show()
 
     # Apply 3D Gaussian smoothing to the downsampled data
@@ -163,12 +230,26 @@ def extract_pebble(times, traces, dx, dy, x_min, x_max, width, y_min, y_max, hei
     extent = [0, b_scan_filtered.shape[0] * spacing_x_down, b_scan_filtered.shape[1] * spacing_z_down, 0]
 
     if plot_b_scan:
-        plt.figure(figsize=(8, 6))
-        plt.ylabel("Depth (mm)")
-        plt.imshow(b_scan_filtered.T, extent=extent, aspect='1', cmap=cm.berlin)
-        plt.xlabel("Width (mm)")
-        plt.title("Masked B-Scan")
+        fig, ax = plt.subplots(figsize=(12, 8))
+        ax.set_ylabel("OPL (Depth) [mm]")
+        ax.imshow(b_scan_filtered.T, extent=extent, aspect='1', cmap=cm.vik)
+        ax.set_xlabel("Width [mm]")
+        # ax.set_title("Masked B-Scan")
+
+        if surface is not None:
+            x = np.linspace(0, b_scan.shape[0] * spacing_x, b_scan.shape[0])
+            ax.plot(x, surface_b_scan, color="black", linewidth=4)
+
+        # Left rectangle
+        ax.add_patch(Rectangle((0, 0), rim_width_l, height_mm, color='white', zorder=2, alpha=0.7))
+        # Right rectangle
+        ax.add_patch(
+            Rectangle((b_scan.shape[0] * spacing_x - rim_width_r, 0), rim_width_r, height_mm, color='white', zorder=2,
+                      alpha=0.7))
+
+
         plt.savefig(output_path.joinpath(f"{filename}_masked_b_scan.png"), dpi=300)
+        plt.savefig(output_path.joinpath(f"{filename}_masked_b_scan.pdf"))
         plt.show()
 
     z_min_mm, z_max_mm = z_range
@@ -188,9 +269,17 @@ if __name__ == "__main__":
     path = Path(
         "/Users/linus/Documents/ICE_PEBBLE_SPHERE_CoDA_T3_dust_low_res_vac_9_fast_focus_on_sohere_top/data_image_rfl")
 
-    # SPIPA B, high res, 34 deg phase angle
+    # # SPIPA B, high res, 34 deg phase angle
+    # path = Path(
+    #     "/Users/linus/Documents/ICE_PEBBLE_SPHERE_CoDA_T3_dust_high_res_vac_10_fast_focus_on_sphere_top/data_image_rfl")
+    #
+    # # SPIPA B, low res, 34 deg phase angle
+    # path = Path(
+    #     "/Users/linus/Documents/ICE_PEBBLE_SPHERE_CoDA_T3_dust_low_res_vac_11_fast_focus_on_sphere_top/data_image_rfl")
+
+    # empty control, low res, 34 deg phase angle
     path = Path(
-        "/Users/linus/Documents/ICE_PEBBLE_SPHERE_CoDA_T3_dust_high_res_vac_10_fast_focus_on_sphere_top/data_image_rfl")
+        "/Users/linus/Documents/CONTROL_CoDA_T3_dust_low_res_vac_11_fast_focus_on_sphere_top/data_image_rfl")
 
     path = get_thz_file_from_path(path)
 
@@ -215,15 +304,16 @@ if __name__ == "__main__":
     mask_volume, spacing = extract_pebble(times, traces, dx, dy, x_min, x_max, width, y_min, y_max, height,
                                           output_path=Path("./pebble_extraction"),
                                           filename=path.stem,
+                                          low_cut=0.2,
+                                          high_cut=0.5,
                                           z_range=[-7, -25],
                                           n_dust=1.5,
                                           sigma=6,
-                                          power=2.0,
+                                          power=1.0,
                                           ball_kernel_radius=6,
-                                          threshold=0.15**2,
+                                          threshold=0.1,
                                           sigma_smooth=2.0,
                                           mask_threshold=0.5,
-                                          plot_a_scan=False,
                                           plot_b_scan=True
                                           )
 
@@ -243,7 +333,7 @@ if __name__ == "__main__":
     # plotter = pv.Plotter()
     #
     # plotter.add_volume(grid, scalars="mask",
-    #                    cmap=cm.berlin,
+    #                    cmap=cm.vik,
     #                    name="mask_volume")
     #
     # plotter.add_axes()
@@ -309,8 +399,51 @@ if __name__ == "__main__":
             xaxis_title='X [mm]',
             yaxis_title='Y [mm]',
             zaxis_title='Z [mm]',
-            aspectmode='data'
+            aspectmode='data',
+
+            xaxis=dict(
+                showbackground=False,  # no shaded plane
+                showgrid=True,  # keep grid
+                gridcolor="lightgray",  # typical mpl look
+                gridwidth=1,
+                showline=True,
+                linecolor='black',
+                linewidth=2,
+                zeroline=False,
+                ticks='outside',
+                tickcolor='black',
+            ),
+            yaxis=dict(
+                showbackground=False,
+                showgrid=True,
+                gridcolor="lightgray",
+                gridwidth=1,
+                showline=True,
+                linecolor='black',
+                linewidth=2,
+                zeroline=False,
+                ticks='outside',
+                tickcolor='black',
+            ),
+            zaxis=dict(
+                showbackground=False,
+                showgrid=True,
+                gridcolor="lightgray",
+                gridwidth=1,
+                showline=True,
+                linecolor='black',
+                linewidth=2,
+                zeroline=False,
+                ticks='outside',
+                tickcolor='black',
+            ),
         ),
+        scene_camera=dict(
+            projection=dict(type='orthographic')
+        ),
+
+        plot_bgcolor="white",
+        paper_bgcolor="white",
     )
 
     fig.show()

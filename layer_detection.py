@@ -145,6 +145,9 @@ if __name__ == "__main__":
         convolved_data = convolve1d(np.abs(b_scan[x, :]), kernel)
         b_scan_convolved[x] = convolved_data
 
+    gate = 5
+    b_scan_convolved[b_scan_convolved > gate] = gate
+
     spacing_x = dx
     spacing_y = dy
 
@@ -163,7 +166,7 @@ if __name__ == "__main__":
     im = ax.imshow(image, extent=extent, aspect=1, norm="log", cmap=cm.vik)
 
     x = np.linspace(0, b_scan.shape[0] * spacing_x, b_scan.shape[0])
-    ax.plot(x, surface_b_scan, color="black", linewidth=2)
+    ax.plot(x, surface_b_scan, color="black", linewidth=4)
 
     ax.set_xlabel("Width [mm]")
     ax.set_ylabel("OPL (Depth) [mm]")
