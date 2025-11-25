@@ -40,8 +40,8 @@ if __name__ == "__main__":
     #     "/Users/linus/Documents/ICE_PEBBLE_SPHERE_CoDA_T3_dust_low_res_vac_10_fast_focus_on_sphere_top/data_image_rfl")
 
     # # SPIPA B, high res, 34 deg phase angle
-    path = Path(
-         "/Users/linus/Documents/ICE_PEBBLE_SPHERE_CoDA_T3_dust_high_res_vac_10_fast_focus_on_sphere_top/data_image_rfl")
+    # path = Path(
+    #    "/Users/linus/Documents/ICE_PEBBLE_SPHERE_CoDA_T3_dust_high_res_vac_10_fast_focus_on_sphere_top/data_image_rfl")
 
     # # empty control, low res, 34 deg phase angle
     # path = Path(
@@ -66,7 +66,6 @@ if __name__ == "__main__":
         traces = np.array(datasets["dataset"])
 
     traces = traces[::, ::, :]
-
 
     surface = extract_surface(times, traces, x_min, x_max, width, y_min, y_max, height,
                               low_cut=1.0,
@@ -290,7 +289,8 @@ if __name__ == "__main__":
             x_range_mm = np.ptp(verts_mm[:, 0])
             y_range_mm = np.ptp(verts_mm[:, 1])
             z_range_mm = np.ptp(verts_mm[:, 2])
-        except ValueError:
+        except ValueError as e:
+            print("Marching cubes failed:", e)
             ax.set_zticks([0, -10])
             x_range_mm = np.ptp(x_mm)
             y_range_mm = np.ptp(y_mm)
@@ -306,6 +306,21 @@ if __name__ == "__main__":
 
         ax.grid(True, color='lightgray', linewidth=0.5)
 
+        # X and Y extents come from the surface grid
+        x_range_mm = np.ptp(X)
+        y_range_mm = np.ptp(Y)
+
+        # Z extent should include the deepest element: either the surface or the mesh
+        z_surface_min = np.min(surface)
+        z_surface_max = np.max(surface)
+
+        try:
+            z_mask_min = np.min(verts_mm[:, 2])
+            z_mask_max = np.max(verts_mm[:, 2])
+            z_range_mm = max(z_surface_max, z_mask_max) - min(z_surface_min, z_mask_min)
+        except NameError:
+            # Fallback: only surface exists
+            z_range_mm = np.ptp(surface)
 
         ax.set_box_aspect([x_range_mm, y_range_mm, z_range_mm])
 
