@@ -18,6 +18,28 @@ from surface_extraction import extract_surface
 import pyvista as pv
 import numpy as np
 from skimage.measure import marching_cubes
+from plot_style import FOREGROUND_COLOR, apply_plot_style, save_figure
+
+ROOT_DIR = Path(__file__).resolve().parent
+MEASUREMENTS_DIR = ROOT_DIR / "data" / "transmission_pebble" / "measurements"
+MEASUREMENTS = {
+    "solid_ice_pebble": ("SOLID", "ICE_PEBBLE_CoDA_T3_dust_low_res_vac_trans_5"), # SPIPA-B ICE, low res, 38 deg phase angle
+    "spipa_b_pebble": ("Spipa-B", "ICE_PEBBLE_CoDA_T3_dust_low_res_vac_trans_4"), # low res, 38 deg phase angle
+}
+
+ACTIVE_MEASUREMENT = "solid_ice_pebble"
+MATERIAL, measurement_directory = MEASUREMENTS[ACTIVE_MEASUREMENT]
+DATA_DIR = MEASUREMENTS_DIR / measurement_directory / "data_image"
+
+REFERENCES = {
+    "comet_dust_image_mean": (
+        "image_mean",
+        MEASUREMENTS_DIR / "comet_dust_pellet_HESSO_silicon_ref_vac_3" / "data_image",
+    ),
+}
+ACTIVE_REFERENCE = "comet_dust_image_mean"
+REFERENCE_MODE, REFERENCE_PATH = REFERENCES[ACTIVE_REFERENCE]
+RESULTS_DIR = ROOT_DIR / "results" / "transmission_pebble"
 
 params = {"ytick.color":
               "black",
@@ -44,6 +66,7 @@ params = {"ytick.color":
               18}
 
 plt.rcParams.update(params)
+apply_plot_style()
 
 
 def get_refraction_index(time, traces, t_ref, p_ref, window_half_width=15, win_func="hanning",
@@ -129,43 +152,36 @@ def get_refraction_index(time, traces, t_ref, p_ref, window_half_width=15, win_f
     return freq, refractive_index
 
 
-# plt.style.use('dark_background')
+def load_reference(mode, reference_path):
+    """Load either a spatially averaged image reference or a single-pixel reference."""
+    if mode == "image_mean":
+        path = get_thz_file_from_path(reference_path)
+        if path is None:
+            raise FileNotFoundError(f"No *_data.thz reference found in {reference_path}")
+
+        with DotthzFile(path) as reference_file:
+            key = list(reference_file.keys())[0]
+            datasets = reference_file[key].datasets
+            reference_time = np.array(datasets["time"])
+            reference_traces = np.array(datasets["dataset"])
+
+        reference_pulse = np.mean(reference_traces, axis=(0, 1))
+        return reference_time, reference_pulse
+
+    if mode == "single_pixel":
+        with DotthzFile(reference_path) as reference_file:
+            sample = reference_file["Single Pixel 0"].datasets["Sample"][:]
+        return sample[:, 0], sample[:, 1]
+
+    raise ValueError(f"Unknown reference mode: {mode}")
 
 
 if __name__ == "__main__":
-    # ref_path = Path("/Users/linus/Documents/comet_dust_pellet_HESSO_silicon_ref_vac_3/data_image")
-    #
-    # path = get_thz_file_from_path(ref_path)
-    #
-    # with DotthzFile(path) as psf_data:
-    #     key = list(psf_data.keys())[0]
-    #     datasets = psf_data[key].datasets
-    #
-    #     # from the first dataset, extract the image:
-    #     t_ref = np.array(datasets["time"])
-    #     traces_ref = np.array(datasets["dataset"])
-    #
-    # p_ref = np.mean(traces_ref, axis=(0, 1))
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    t_ref, p_ref = load_reference(REFERENCE_MODE, REFERENCE_PATH)
 
-    ref_path = Path("/Users/linus/Documents/porosity_august2_2026_focused_silicon_reference/data/trans/single_pixel/1786972921.4414234_sp_data.thz")
-    with DotthzFile(ref_path) as ref_file:
-        sample = ref_file["Single Pixel 0"].datasets["Sample"][:]
-        t_ref = sample[:, 0]
-        p_ref = sample[:, 1]
-
-    # SPIPA-B ICE, low res, 38 deg phase angle
-    material, path = ("SPIPA-B", Path("/Users/linus/Documents/ICE_PEBBLE_CoDA_T3_dust_low_res_vac_trans_4/data_image"))
-
-    material, path = ("Frost", Path("/Users/linus/Documents/porosity_august2_2026_focused_frost_5.0mm_1.7g/data_image"))
-    material, path = ("Frost HR", Path("/Users/linus/Documents/porosity_august2_2026_hr_focused_frost_10.0mm_7.2g/data_image"))
-    # material, path = ("Frost UHR", Path("/Users/linus/Documents/porosity_august2_uhr_2026_focused_frost_10.0mm_7.2g/data_image"))
-    # material, path = ("Frost LR", Path("/Users/linus/Documents/porosity_august2_lr_2026_focused_frost_10.0mm_7.2g/data_image"))
-
-
-    # solid ICE, low res, 38 deg phase angle
-    # material, path = ("solid", Path("/Users/linus/Documents/ICE_PEBBLE_CoDA_T3_dust_low_res_vac_trans_5/data_image"))
-
-    path = get_thz_file_from_path(path)
+    material = MATERIAL
+    path = get_thz_file_from_path(DATA_DIR)
 
     with DotthzFile(path) as psf_data:
         key = list(psf_data.keys())[0]
@@ -188,29 +204,31 @@ if __name__ == "__main__":
     # traces = traces[::, ::, times < 1960]
     # times = times[times < 1960]
 
-    plt.plot(times, traces[width // 2, height // 2, :])
-    plt.plot(times, traces[width // 4, height // 4, :])
-    #plt.plot(times, traces[48, 68, :])
-    #plt.plot(times, traces[42, 60, :])
-    plt.plot(t_ref, p_ref, color="black")
-    plt.title("Example Trace Before Surface Extraction")
-    plt.xlabel("Time (ps)")
-    plt.ylabel("Signal (a.u.)")
-    plt.show()
+    # plt.plot(times, traces[width // 2, height // 2, :])
+    # plt.plot(times, traces[width // 4, height // 4, :])
+    # #plt.plot(times, traces[48, 68, :])
+    # #plt.plot(times, traces[42, 60, :])
+    # plt.plot(t_ref, p_ref, color=FOREGROUND_COLOR)
+    # plt.title("Example Trace Before Surface Extraction")
+    # plt.xlabel("Time (ps)")
+    # plt.ylabel("Signal (a.u.)")
+    # plt.tight_layout()
+    # plt.show()
 
     freqs, refractive_index = get_refraction_index(times, traces, t_ref, p_ref,
                                                    window_half_width=25, win_func="hanning",
                                                    min_frequency=0.5, max_frequency=3, d_mm=10.0,
-                                                   mask_radius=60, mask_center_x=-3, mask_center_y=-6)
+                                                   mask_radius=25, mask_center_x=-3, mask_center_y=-6)
 
-    plt.plot(freqs, refractive_index[width // 2, height // 2, :])
-    plt.show()
+    # plt.plot(freqs, refractive_index[width // 2, height // 2, :])
+    # plt.tight_layout()
+    # plt.show()
 
     image = np.nanmean(refractive_index, axis=2)
     cutoff = 2.1
     image[image > cutoff] = np.nan
     # image = refractive_index[:, :, np.round(freqs,2) == 0.5]
-    norm = Normalize(vmin=1.0, vmax=1.5)
+    norm = Normalize(vmin=1.0, vmax=2.0)
     plt.imshow(image, cmap=cm.managua, norm=norm, aspect="equal", extent=(0, x_max - x_min, 0, y_max - y_min))
     plt.colorbar(label='Refractive Index')
     plt.xlabel('X [mm]')
@@ -220,6 +238,6 @@ if __name__ == "__main__":
 
     plt.tight_layout()
     # plt.title('Average Refractive Index Map')
-    plt.savefig(f'pebble_transmission_{material}_inv.png', dpi=300)
-    plt.savefig(f'pebble_transmission_{material}_inv.pdf')
+    save_figure(RESULTS_DIR / f'pebble_transmission_{material}_inv.png', dpi=300)
+    save_figure(RESULTS_DIR / f'pebble_transmission_{material}_inv.pdf')
     plt.show()

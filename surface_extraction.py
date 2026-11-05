@@ -8,7 +8,6 @@ from typing import Optional
 import numpy as np
 from matplotlib import pyplot as plt
 from pydotthz import DotthzFile
-from math_utils import get_fft, get_ifft
 from scipy.signal import find_peaks
 import scipy.constants
 from tqdm import tqdm
@@ -17,6 +16,17 @@ from scipy.ndimage import median_filter, gaussian_filter
 from thz_deconvolution import Deconvolution
 from envelope import gaussian_kernel1d, convolve1d, envelope_hilbert
 from estimate_noise import NoiseEstimator
+
+ROOT_DIR = Path(__file__).resolve().parent
+PSF_DATA_DIR = ROOT_DIR / "data" / "psf"
+MEASUREMENTS_DIR = ROOT_DIR / "data" / "surface_extraction" / "measurements"
+MEASUREMENTS = {
+    "coc_spheres_fine_scan_3": "COC_SPHERES_fine_scan_3",
+}
+
+ACTIVE_MEASUREMENT = "coc_spheres_fine_scan_3"
+EXAMPLE_DATA_DIR = MEASUREMENTS_DIR / MEASUREMENTS[ACTIVE_MEASUREMENT] / "data_image_rfl"
+EXAMPLE_RESULTS_DIR = ROOT_DIR / "results" / "surface_extraction"
 
 
 def get_dynamic_range(data, percentile=0.999):
@@ -459,8 +469,10 @@ def extract_surface(times, traces, x_min, x_max, width, y_min, y_max, height, pa
 
     traces = traces[::, ::, :]
     Decon = Deconvolution(
-        knife_edge_x_path=Path("psf_data/example_beam_width/measurement_x/data/1750085285.8557956_data.thz"),
-        knife_edge_y_path=Path("psf_data/example_beam_width/measurement_y/data/1750163177.929295_data.thz"),
+        knife_edge_x_path=(PSF_DATA_DIR / "example_beam_width" / "measurement_x" / "data" /
+                           "1750085285.8557956_data.thz"),
+        knife_edge_y_path=(PSF_DATA_DIR / "example_beam_width" / "measurement_y" / "data" /
+                           "1750163177.929295_data.thz"),
         low_cut=low_cut,
         high_cut=high_cut,
         start_freq=start_freq,
@@ -517,20 +529,8 @@ def extract_surface(times, traces, x_min, x_max, width, y_min, y_max, height, pa
 
 
 if __name__ == '__main__':
-
-    path = Path("/Users/linus/Documents/COC_terrain/data_image_rfl")
-    # path = Path("/Users/linus/Documents/COC_SPHERES_fine_scan/data_image_rfl")
-    # path = Path("/Users/linus/Documents/COC_SPHERES_fine_scan_3/data_image_rfl")
-    # path = Path("/Users/linus/Documents/COC_FULL_SPHERES_fine_scan/data_image_rfl")
-    # path = Path("/Users/linus/Documents/resolution_scan_A_high_res_6/data_image_rfl")
-    # path = Path("/Users/linus/Documents/COC_SPHERES_ext_rng/data_image_rfl")
-    path = Path("/Users/linus/Documents/COC_terrain_res_target_2/data_image_rfl")
-    # path = Path("/Users/linus/Documents/DUST_surface_res_target_3d_3/data_image_rfl")
-    # path = Path("/Users/linus/Documents/COC_PEBBLE_CoDA_T1a_2/data_image_rfl")
-    # path = Path("/Users/linus/Documents/Solid_ICE_PEBBLE_CoDA_T1a_2/data_image_rfl")
-    # path = Path("/Users/linus/Documents/SPIPA_ICE_PEBBLE_CoDA_T1a_2/data_image_rfl")
-
-    path = get_thz_file_from_path(path)
+    EXAMPLE_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    path = get_thz_file_from_path(EXAMPLE_DATA_DIR)
 
     with DotthzFile(path) as psf_data:
         key = list(psf_data.keys())[0]
@@ -550,10 +550,11 @@ if __name__ == '__main__':
 
     traces = traces[::, ::, :]
 
-    # Decon = Deconvolution(psf_path=Path("psf_data/psf.npz"), low_cut=0.1, high_cut=5.0)
     Decon = Deconvolution(
-        knife_edge_x_path=Path("psf_data/example_beam_width/measurement_x/data/1750085285.8557956_data.thz"),
-        knife_edge_y_path=Path("psf_data/example_beam_width/measurement_y/data/1750163177.929295_data.thz"),
+        knife_edge_x_path=(PSF_DATA_DIR / "example_beam_width" / "measurement_x" / "data" /
+                           "1750085285.8557956_data.thz"),
+        knife_edge_y_path=(PSF_DATA_DIR / "example_beam_width" / "measurement_y" / "data" /
+                           "1750163177.929295_data.thz"),
         low_cut=1.0, high_cut=5.0)
 
     traces_old = traces
@@ -576,13 +577,6 @@ if __name__ == '__main__':
 
     for x in tqdm(range(p.shape[0])):
         for y in range(p.shape[1]):
-
-            # f, a, arg = get_fft(t, p[x, y, :])
-            #
-            # a[f < 1.0] = 0
-            # a[f > 5.0] = 0
-            #
-            # time, pulse = get_ifft(f, a, arg, t0=t[0])
 
             time, pulse = t, p[x, y, :]
 
@@ -651,39 +645,8 @@ if __name__ == '__main__':
             else:
                 surface[x, y] = - get_thickness(t[0], t1) * 1000  # in mm
 
-    # # Initialize arrays to store multiple peak candidates
-    # max_candidates = 2
-    # surface_candidates = np.zeros((p.shape[0], p.shape[1], max_candidates))
-    #
-    # for x in range(p.shape[0]):
-    #     for y in range(p.shape[1]):
-    #         f, a, arg = get_fft(t, p[x, y, :])
-    #         a[f < 0.1] = 0
-    #         time, pulse = get_ifft(f, a, arg, t0=t[0])
-    #
-    #         # Detect first two peaks with their zero crossings
-    #         peak_results = detect_first_two_peaks_with_zero_crossings(time, pulse, height=2)
-    #
-    #         # Store candidates (use zero crossing times)
-    #         for i, (peak_time, zero_crossing_time) in enumerate(peak_results):
-    #             if i < max_candidates:
-    #                 surface_candidates[x, y, i] = zero_crossing_time
-    #
-    # # Apply neighborhood-based smoothing to select best peaks
-    # surface_raw = smooth_peak_selection(surface_candidates, neighborhood_size=3, max_deviation_factor=1)
-    #
-    # # Convert to thickness
-    # surface = np.zeros_like(surface_raw)
-    # for x in range(surface_raw.shape[0]):
-    #     for y in range(surface_raw.shape[1]):
-    #         t1 = surface_raw[x, y]
-    #         if t1 == 0:
-    #             surface[x, y] = 0
-    #         else:
-    #             surface[x, y] = get_thickness(t1, 0) * 1000  # in mm
-
     save_surface_as_point_cloud(surface, x_max, x_min, y_max, y_min,
-                                path.with_suffix(".ply"), format='ply')
+                                EXAMPLE_RESULTS_DIR / f"{path.stem}.ply", format='ply')
 
     # Plot the surface as a 3D mesh
     fig = plt.figure()

@@ -1,223 +1,221 @@
 from pathlib import Path
 
-from matplotlib.patches import Rectangle
-from pydotthz import DotthzFile
-import matplotlib.pyplot as plt
-import numpy as np
-from thz_deconvolution import Deconvolution
-
-from pyhelper import unibe
-from surface_extraction import get_thz_file_from_path, extract_surface
-from tqdm import tqdm
-from envelope import gaussian_kernel1d, convolve1d
 from cmcrameri import cm
-from surface_extraction import get_thickness
+from matplotlib import pyplot as plt
+from matplotlib.patches import Rectangle
 from mpl_toolkits.axes_grid1 import make_axes_locatable
+import numpy as np
+from pydotthz import DotthzFile
+from thz_deconvolution import Deconvolution
+from tqdm import tqdm
 
-params = {"ytick.color":
-              "black",
+from envelope import gaussian_kernel1d, convolve1d
+from plot_style import FOREGROUND_COLOR, apply_plot_style, save_figure
+from pyhelper import unibe
+from surface_extraction import get_thz_file_from_path, extract_surface, get_thickness
 
-          "xtick.color":
-              "black",
 
-          "axes.labelcolor":
-              "black",
+ROOT_DIR = Path(__file__).resolve().parent
+MEASUREMENTS_DIR = ROOT_DIR / "data" / "layer_detection" / "measurements"
+MEASUREMENTS = {
+    "coc": ("COC_PEBBLE_CoDA_T3_dust_low_res_vac_4", "COC", False),
+    "coc_tilted": ("COC_PEBBLE_CoDA_T3_dust_low_res_vac_5", "COC", True),
+    "ice": ("ICE_PEBBLE_CoDA_T3_dust_low_res_vac_5", "ICE", False),
+    "ice_tilted": ("ICE_PEBBLE_CoDA_T3_dust_low_res_vac_6_small_fov_slow", "ICE", True),
+}
 
-          "axes.edgecolor":
-              "black",
+# Change this key to select one of the four locally copied measurements above.
+ACTIVE_MEASUREMENT = "coc"
+measurement_directory, MATERIAL, TILTED = MEASUREMENTS[ACTIVE_MEASUREMENT]
+DATA_DIR = MEASUREMENTS_DIR / measurement_directory / "data_image_rfl"
+PSF_DATA_DIR = ROOT_DIR / "data" / "psf" / "example_beam_width"
+RESULTS_DIR = ROOT_DIR / "results" / "layer_detection"
 
-          "mathtext.fontset":
-              "cm",
 
-          "mathtext.rm":
-              "Times New Roman",
-
-          "font.family":
-              "Helvetica Neue",
-
-          "font.size":
-              24}
-
+params = {
+    "mathtext.fontset": "cm",
+    "mathtext.rm": "Times New Roman",
+    "font.family": "Helvetica Neue",
+    "font.size": 24,
+}
 plt.rcParams.update(params)
+apply_plot_style()
 
 
 def percentile_scale(cube, percentile=97.0):
     """
-    cube: 3D ndarray (nx, ny, nt) with bipolar time-domain signals.
-    Returns:
-      scaled_float: same shape, clipped symmetrically to ±p97 and scaled to [-1, 1]
-      scaled_u8: same shape, mapped to 8-bit grayscale [0, 255] (white=positive, black=negative)
-      p97: the symmetric clip value used
+    Scale a 3D time-domain cube symmetrically around zero.
+
+    Returns the clipped float cube, an 8-bit grayscale cube, and the
+    percentile amplitude used for clipping.
     """
     if not isinstance(cube, np.ndarray) or cube.ndim != 3:
         raise ValueError("cube must be a 3D numpy array (nx, ny, nt)")
 
-    # robust symmetric limit from absolute amplitudes
-    p = np.percentile(np.abs(cube), percentile)
+    percentile_amplitude = np.percentile(np.abs(cube), percentile)
 
-    # avoid divide-by-zero if the cube is all zeros
-    if p == 0:
+    if percentile_amplitude == 0:
         scaled_float = np.zeros_like(cube, dtype=np.float32)
-        scaled_u8 = np.full_like(cube, 128, dtype=np.uint8)  # mid-gray
-        return scaled_float, scaled_u8, p
+        scaled_u8 = np.full_like(cube, 128, dtype=np.uint8)
+        return scaled_float, scaled_u8, percentile_amplitude
 
-    # clip symmetrically and scale to [-1, 1]
-    clipped = np.clip(cube, -p, p)
-    scaled_float = (clipped / p).astype(np.float32)
-
-    # map [-1, 1] -> [0, 255] (0=black negative, 128=mid-gray zero, 255=white positive)
+    clipped = np.clip(cube, -percentile_amplitude, percentile_amplitude)
+    scaled_float = (clipped / percentile_amplitude).astype(np.float32)
     scaled_u8 = np.round((scaled_float + 1.0) * 0.5 * 255.0).astype(np.uint8)
-
-    return scaled_float, scaled_u8, p
+    return scaled_float, scaled_u8, percentile_amplitude
 
 
 if __name__ == "__main__":
-    # COC solid, low res, 38 deg phase angle
-    path, material, tilted = (Path("/Users/linus/Documents/COC_PEBBLE_CoDA_T3_dust_low_res_vac_4/data_image_rfl"),
-                              "COC", False)
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    path = get_thz_file_from_path(DATA_DIR)
+    material = MATERIAL
+    tilted = TILTED
 
-    # COC solid, low res, 38 deg phase angle, tilted
-    # path, material, tilted = (Path("/Users/linus/Documents/COC_PEBBLE_CoDA_T3_dust_low_res_vac_5/data_image_rfl"),
-    #                          "COC", True)
-
-    # solid, low res, 38 deg phase angle
-    # path, material, tilted = (Path("/Users/linus/Documents/ICE_PEBBLE_CoDA_T3_dust_low_res_vac_5/data_image_rfl"),
-    #                           "ICE", False)
-
-    # solid, low res, 38 deg phase angle, tilted
-    # path, material, tilted = (
-    #     Path("/Users/linus/Documents/ICE_PEBBLE_CoDA_T3_dust_low_res_vac_6_small_fov_slow/data_image_rfl"), "ICE", True)
-
-    path = get_thz_file_from_path(path)
-
-    with DotthzFile(path) as psf_data:
-        key = list(psf_data.keys())[0]
-        dx = float(psf_data[key].metadata['dx [mm]'])
-        dy = float(psf_data[key].metadata['dy [mm]'])
-        x_min = float(psf_data[key].metadata['x_min [mm]'])
-        x_max = float(psf_data[key].metadata['x_max [mm]'])
-        y_min = float(psf_data[key].metadata['y_min [mm]'])
-        y_max = float(psf_data[key].metadata['y_max [mm]'])
-        rectangle_width = int(float(psf_data[key].metadata['width']))
-        rectangle_height = int(float(psf_data[key].metadata['height']))
-        datasets = psf_data[key].datasets
-
-        # from the first dataset, extract the image:
+    with DotthzFile(path) as measurement:
+        key = list(measurement.keys())[0]
+        dx = float(measurement[key].metadata["dx [mm]"])
+        dy = float(measurement[key].metadata["dy [mm]"])
+        x_min = float(measurement[key].metadata["x_min [mm]"])
+        x_max = float(measurement[key].metadata["x_max [mm]"])
+        y_min = float(measurement[key].metadata["y_min [mm]"])
+        y_max = float(measurement[key].metadata["y_max [mm]"])
+        scan_width = int(float(measurement[key].metadata["width"]))
+        scan_height = int(float(measurement[key].metadata["height"]))
+        datasets = measurement[key].datasets
         times = np.array(datasets["time"])
         traces = np.array(datasets["dataset"])
 
-    traces = traces[::, ::, :]
-    surface = extract_surface(times, traces, x_min, x_max, rectangle_width, y_min, y_max, rectangle_height,
-                              t_cutoff=None, smooth=True,
-                              smooth_median_size=1,
-                              smooth_threshold=2.0,
-                              smooth_iterations=3,
-                              smooth_gaussian_sigma=0.5,
-                              smooth_preserve_nan=True)
+    surface = extract_surface(
+        times,
+        traces,
+        x_min,
+        x_max,
+        scan_width,
+        y_min,
+        y_max,
+        scan_height,
+        t_cutoff=None,
+        smooth=True,
+        smooth_median_size=1,
+        smooth_threshold=2.0,
+        smooth_iterations=3,
+        smooth_gaussian_sigma=0.5,
+        smooth_preserve_nan=True,
+    )
 
-    # Decon = Deconvolution(psf_path=Path("psf_data/psf.npz"), low_cut=0.1, high_cut=5.0)
-    Decon = Deconvolution(
-        knife_edge_x_path=Path("psf_data/example_beam_width/measurement_x/data/1750085285.8557956_data.thz"),
-        knife_edge_y_path=Path("psf_data/example_beam_width/measurement_y/data/1750163177.929295_data.thz"),
-        low_cut=0.1, high_cut=1.0, start_freq=0.1, end_freq=1.0)
+    deconvolution = Deconvolution(
+        knife_edge_x_path=(PSF_DATA_DIR / "measurement_x" / "data" /
+                           "1750085285.8557956_data.thz"),
+        knife_edge_y_path=(PSF_DATA_DIR / "measurement_y" / "data" /
+                           "1750163177.929295_data.thz"),
+        low_cut=0.1,
+        high_cut=1.0,
+        start_freq=0.1,
+        end_freq=1.0,
+    )
+    traces = deconvolution.apply_deconvolution(
+        traces,
+        x_min,
+        x_max,
+        scan_width,
+        y_min,
+        y_max,
+        scan_height,
+        max_iter=100,
+    )
 
-    traces_old = traces
-    deconvolved_traces = Decon.apply_deconvolution(traces, x_min, x_max, rectangle_width, y_min, y_max,
-                                                   rectangle_height, max_iter=100)
-    traces = deconvolved_traces
-
-    # p = traces[::, ::, times < 1912]
-    # t = times[times < 1912]
-
-    traces = traces[::, ::, :]
-    times = times[:]
-
-    w, h, d = traces.shape
-    b_scan = traces[:, w // 2, :]
-    # b_scan = traces[w // 2, :, :]
-
+    width, _, _ = traces.shape
+    b_scan = traces[:, width // 2, :]
     b_scan_convolved = np.zeros_like(b_scan)
 
     sigma = 10
     kernel = gaussian_kernel1d(sigma=sigma, radius=sigma * 3)
-
-    for x in tqdm(range(traces.shape[0])):
-        convolved_data = convolve1d(np.abs(b_scan[x, :]), kernel)
-        b_scan_convolved[x] = convolved_data
+    for x_index in tqdm(range(traces.shape[0])):
+        b_scan_convolved[x_index] = convolve1d(np.abs(b_scan[x_index, :]), kernel)
 
     gate = 5
     b_scan_convolved[b_scan_convolved > gate] = gate
 
     spacing_x = dx
-    spacing_y = dy
+    refractive_index = 1.0
+    spacing_z = -(get_thickness(times[0], times[1]) * 1000) / refractive_index
 
-    n_COC = 1.0
-
-    spacing_z = -(get_thickness(times[0], times[1]) * 1000) / n_COC
-
-    image = b_scan_convolved
-    image = image.T
-
-    surface_b_scan = surface[:, rectangle_width // 2 + 4]
-    print(surface_b_scan)
+    image = b_scan_convolved.T
+    surface_b_scan = surface[:, scan_width // 2 + 4]
 
     fig, ax = plt.subplots(figsize=(12, 8))
     extent = [0, b_scan.shape[0] * spacing_x, b_scan.shape[1] * spacing_z, 0]
-    im = ax.imshow(image, extent=extent, aspect=1, norm="log", cmap=cm.vik)
+    image_artist = ax.imshow(image, extent=extent, aspect=1, norm="log", cmap=cm.vik)
 
-    x = np.linspace(0, b_scan.shape[0] * spacing_x, b_scan.shape[0])
-    ax.plot(x, surface_b_scan, color="black", linewidth=4)
-
+    x_axis = np.linspace(0, b_scan.shape[0] * spacing_x, b_scan.shape[0])
+    ax.plot(x_axis, surface_b_scan, color=FOREGROUND_COLOR, linewidth=4)
     ax.set_xlabel("Width [mm]")
     ax.set_ylabel("OPL (Depth) [mm]")
     ax.set_title("B-Scan")
 
     divider = make_axes_locatable(ax)
-    cax = divider.append_axes("right", size="5%", pad=0.5)
-    cbar = fig.colorbar(im, cax=cax)
-    cbar.set_label("Intensity [a.u.]")
+    colorbar_axis = divider.append_axes("right", size="5%", pad=0.5)
+    colorbar = fig.colorbar(image_artist, cax=colorbar_axis)
+    colorbar.set_label("Intensity [a.u.]")
 
-    # Overlay white rectangles on left and right 10mm
-    rim_width = 5  # mm
+    rim_width = 5
     height_mm = b_scan.shape[1] * spacing_z
     width_mm = b_scan.shape[0] * spacing_x
 
     if not tilted:
-        # highlight top surface
-        rectangle_width = 18
-        rectangle_height = 5
+        layer_rectangle_width = 18
+        layer_rectangle_height = 5
         if "ICE" in material:
             cube_offset = 4
             cube_height = 9
         else:
             cube_offset = 0
             cube_height = 8
-        top_surface_start = (width_mm / 2 - rectangle_width / 2,
-                             height_mm / 2 - cube_offset - rectangle_height / 2 - cube_height)
-        ax.add_patch(Rectangle(top_surface_start, rectangle_width, rectangle_height, edgecolor=unibe.RED, linewidth=4,
-                               facecolor="none", zorder=2, alpha=1))
 
-        bottom_surface_start = (width_mm / 2 - rectangle_width / 2,
-                                height_mm / 2 - cube_offset - rectangle_height / 2 + cube_height)
-        ax.add_patch(
-            Rectangle(bottom_surface_start, rectangle_width, rectangle_height, edgecolor=unibe.BLUE, linewidth=4,
-                      facecolor="none", zorder=2, alpha=1))
+        top_surface_start = (
+            width_mm / 2 - layer_rectangle_width / 2,
+            height_mm / 2 - cube_offset - layer_rectangle_height / 2 - cube_height,
+        )
+        ax.add_patch(Rectangle(
+            top_surface_start,
+            layer_rectangle_width,
+            layer_rectangle_height,
+            edgecolor=unibe.RED,
+            linewidth=4,
+            facecolor="none",
+            zorder=2,
+        ))
 
-    if "ICE" in material and tilted:
-        pass
-    else:
-        # Left rectangle
-        ax.add_patch(Rectangle((0, 0), rim_width, height_mm, color='white', zorder=2, alpha=0.7))
-        # Right rectangle
-        ax.add_patch(
-            Rectangle((b_scan.shape[0] * spacing_x - rim_width, 0), rim_width, height_mm, color='white', zorder=2,
-                      alpha=0.7))
+        bottom_surface_start = (
+            width_mm / 2 - layer_rectangle_width / 2,
+            height_mm / 2 - cube_offset - layer_rectangle_height / 2 + cube_height,
+        )
+        ax.add_patch(Rectangle(
+            bottom_surface_start,
+            layer_rectangle_width,
+            layer_rectangle_height,
+            edgecolor=unibe.BLUE,
+            linewidth=4,
+            facecolor="none",
+            zorder=2,
+        ))
 
-    if tilted:
-        tilted = "_45"
-    else:
-        tilted = ""
-    plt.savefig(f"{material}_B-Scan-Layers{tilted}.png")
-    plt.savefig(f"{material}_B-Scan-Layers{tilted}.pdf")
+    if not ("ICE" in material and tilted):
+        ax.add_patch(Rectangle(
+            (0, 0), rim_width, height_mm,
+            color=FOREGROUND_COLOR, zorder=2, alpha=0.7,
+        ))
+        ax.add_patch(Rectangle(
+            (b_scan.shape[0] * spacing_x - rim_width, 0),
+            rim_width,
+            height_mm,
+            color=FOREGROUND_COLOR,
+            zorder=2,
+            alpha=0.7,
+        ))
 
+    tilt_suffix = "_45" if tilted else ""
+    output_stem = f"{material}_B-Scan-Layers{tilt_suffix}"
+    save_figure(RESULTS_DIR / f"{output_stem}.png", dpi=300)
+    save_figure(RESULTS_DIR / f"{output_stem}.pdf")
     plt.show()

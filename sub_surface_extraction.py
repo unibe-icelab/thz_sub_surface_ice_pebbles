@@ -20,6 +20,28 @@ from thz_deconvolution import Deconvolution
 from surface_extraction import get_thz_file_from_path
 
 import plotly.graph_objects as go
+from plot_style import (
+    BACKGROUND_COLOR,
+    FOREGROUND_COLOR,
+    GRID_COLOR,
+    apply_plot_style,
+    apply_plotly_style,
+    save_figure,
+)
+
+ROOT_DIR = Path(__file__).resolve().parent
+PSF_DATA_DIR = ROOT_DIR / "data" / "psf"
+MEASUREMENTS_DIR = ROOT_DIR / "data" / "sub_surface_extraction" / "measurements"
+MEASUREMENTS = {
+    "solid_low_res_34deg": "ICE_PEBBLE_SPHERE_CoDA_T3_dust_low_res_vac_9_fast_focus_on_sohere_top",
+    "spipa_b_high_res_34deg": "ICE_PEBBLE_SPHERE_CoDA_T3_dust_high_res_vac_10_fast_focus_on_sphere_top",
+    "spipa_b_low_res_34deg": "ICE_PEBBLE_SPHERE_CoDA_T3_dust_low_res_vac_11_fast_focus_on_sphere_top",
+    "empty_control_low_res_34deg": "CONTROL_CoDA_T3_dust_low_res_vac_11_fast_focus_on_sphere_top",
+}
+
+ACTIVE_MEASUREMENT = "empty_control_low_res_34deg"
+EXAMPLE_DATA_DIR = MEASUREMENTS_DIR / MEASUREMENTS[ACTIVE_MEASUREMENT] / "data_image_rfl"
+EXAMPLE_RESULTS_DIR = ROOT_DIR / "results" / "sub_surface_extraction"
 
 params = {"ytick.color":
               "black",
@@ -46,6 +68,7 @@ params = {"ytick.color":
               24}
 
 plt.rcParams.update(params)
+apply_plot_style()
 
 
 def get_scaled_ball_kernel(radius, downsample_x, downsample_y, downsample_z):
@@ -78,8 +101,10 @@ def extract_pebble(times, traces, dx, dy, x_min, x_max, width, y_min, y_max, hei
                    rim_width_r=5  # mm
                    ):
     Decon = Deconvolution(
-        knife_edge_x_path=Path("psf_data/example_beam_width/measurement_x/data/1750085285.8557956_data.thz"),
-        knife_edge_y_path=Path("psf_data/example_beam_width/measurement_y/data/1750163177.929295_data.thz"),
+        knife_edge_x_path=(PSF_DATA_DIR / "example_beam_width" / "measurement_x" / "data" /
+                           "1750085285.8557956_data.thz"),
+        knife_edge_y_path=(PSF_DATA_DIR / "example_beam_width" / "measurement_y" / "data" /
+                           "1750163177.929295_data.thz"),
         low_cut=low_cut,
         high_cut=high_cut,
         start_freq=start_freq,
@@ -87,6 +112,8 @@ def extract_pebble(times, traces, dx, dy, x_min, x_max, width, y_min, y_max, hei
         win_width=win_width,
         n_filters=n_filters,
         w_max=w_max)
+
+    os.makedirs(output_path, exist_ok=True)
 
     w, h, d = traces.shape
     d_scan = traces[:, w // 2 - 10, :]
@@ -115,8 +142,8 @@ def extract_pebble(times, traces, dx, dy, x_min, x_max, width, y_min, y_max, hei
         cbar = fig.colorbar(im, cax=cax)
         cbar.set_label("Intensity [a.u.]")
 
-        plt.savefig(output_path.joinpath(f"{filename}_raw_b_scan.png"), dpi=300)
-        plt.savefig(output_path.joinpath(f"{filename}_raw_b_scan.pdf"))
+        save_figure(output_path.joinpath(f"{filename}_raw_b_scan.png"), dpi=300)
+        save_figure(output_path.joinpath(f"{filename}_raw_b_scan.pdf"))
         plt.show()
 
     deconvolved_traces = Decon.apply_deconvolution(traces, x_min, x_max, width, y_min, y_max, height, max_iter=100)
@@ -124,8 +151,6 @@ def extract_pebble(times, traces, dx, dy, x_min, x_max, width, y_min, y_max, hei
 
     traces = traces[::, ::, :]
     times = times[:]
-
-    os.makedirs(output_path, exist_ok=True)
 
     surface_b_scan = surface[h // 2, :]
 
@@ -192,7 +217,7 @@ def extract_pebble(times, traces, dx, dy, x_min, x_max, width, y_min, y_max, hei
 
         if surface is not None:
             x = np.linspace(0, b_scan.shape[0] * spacing_x, b_scan.shape[0])
-            ax.plot(x, surface_b_scan, color="black", linewidth=4)
+            ax.plot(x, surface_b_scan, color=FOREGROUND_COLOR, linewidth=4)
 
         # Left rectangle
         ax.add_patch(Rectangle((0, 0), rim_width_l, height_mm, color='white', zorder=2, alpha=0.7))
@@ -206,8 +231,8 @@ def extract_pebble(times, traces, dx, dy, x_min, x_max, width, y_min, y_max, hei
         cbar = fig.colorbar(im, cax=cax)
         cbar.set_label("Intensity [a.u.]")
 
-        plt.savefig(output_path.joinpath(f"{filename}_filtered_b_scan.png"), dpi=300)
-        plt.savefig(output_path.joinpath(f"{filename}_filtered_b_scan.pdf"))
+        save_figure(output_path.joinpath(f"{filename}_filtered_b_scan.png"), dpi=300)
+        save_figure(output_path.joinpath(f"{filename}_filtered_b_scan.pdf"))
         plt.show()
 
     # Apply 3D Gaussian smoothing to the downsampled data
@@ -241,7 +266,7 @@ def extract_pebble(times, traces, dx, dy, x_min, x_max, width, y_min, y_max, hei
 
         if surface is not None:
             x = np.linspace(0, b_scan.shape[0] * spacing_x, b_scan.shape[0])
-            ax.plot(x, surface_b_scan, color="black", linewidth=4)
+            ax.plot(x, surface_b_scan, color=FOREGROUND_COLOR, linewidth=4)
 
         # Left rectangle
         ax.add_patch(Rectangle((0, 0), rim_width_l, height_mm, color='white', zorder=2, alpha=0.7))
@@ -251,8 +276,8 @@ def extract_pebble(times, traces, dx, dy, x_min, x_max, width, y_min, y_max, hei
                       alpha=0.7))
 
 
-        plt.savefig(output_path.joinpath(f"{filename}_masked_b_scan.png"), dpi=300)
-        plt.savefig(output_path.joinpath(f"{filename}_masked_b_scan.pdf"))
+        save_figure(output_path.joinpath(f"{filename}_masked_b_scan.png"), dpi=300)
+        save_figure(output_path.joinpath(f"{filename}_masked_b_scan.pdf"))
         plt.show()
 
     z_min_mm, z_max_mm = z_range
@@ -269,22 +294,8 @@ def extract_pebble(times, traces, dx, dy, x_min, x_max, width, y_min, y_max, hei
 
 
 if __name__ == "__main__":
-    path = Path(
-        "/Users/linus/Documents/ICE_PEBBLE_SPHERE_CoDA_T3_dust_low_res_vac_9_fast_focus_on_sohere_top/data_image_rfl")
-
-    # # SPIPA B, high res, 34 deg phase angle
-    # path = Path(
-    #     "/Users/linus/Documents/ICE_PEBBLE_SPHERE_CoDA_T3_dust_high_res_vac_10_fast_focus_on_sphere_top/data_image_rfl")
-    #
-    # # SPIPA B, low res, 34 deg phase angle
-    # path = Path(
-    #     "/Users/linus/Documents/ICE_PEBBLE_SPHERE_CoDA_T3_dust_low_res_vac_11_fast_focus_on_sphere_top/data_image_rfl")
-
-    # empty control, low res, 34 deg phase angle
-    path = Path(
-        "/Users/linus/Documents/CONTROL_CoDA_T3_dust_low_res_vac_11_fast_focus_on_sphere_top/data_image_rfl")
-
-    path = get_thz_file_from_path(path)
+    EXAMPLE_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    path = get_thz_file_from_path(EXAMPLE_DATA_DIR)
 
     with DotthzFile(path) as psf_data:
         key = list(psf_data.keys())[0]
@@ -305,7 +316,7 @@ if __name__ == "__main__":
     traces = traces[::, ::, :]
 
     mask_volume, spacing = extract_pebble(times, traces, dx, dy, x_min, x_max, width, y_min, y_max, height,
-                                          output_path=Path("./pebble_extraction"),
+                                          output_path=EXAMPLE_RESULTS_DIR,
                                           filename=path.stem,
                                           low_cut=0.2,
                                           high_cut=0.5,
@@ -407,46 +418,47 @@ if __name__ == "__main__":
             xaxis=dict(
                 showbackground=False,  # no shaded plane
                 showgrid=True,  # keep grid
-                gridcolor="lightgray",  # typical mpl look
+                gridcolor=GRID_COLOR,
                 gridwidth=1,
                 showline=True,
-                linecolor='black',
+                linecolor=FOREGROUND_COLOR,
                 linewidth=2,
                 zeroline=False,
                 ticks='outside',
-                tickcolor='black',
+                tickcolor=FOREGROUND_COLOR,
             ),
             yaxis=dict(
                 showbackground=False,
                 showgrid=True,
-                gridcolor="lightgray",
+                gridcolor=GRID_COLOR,
                 gridwidth=1,
                 showline=True,
-                linecolor='black',
+                linecolor=FOREGROUND_COLOR,
                 linewidth=2,
                 zeroline=False,
                 ticks='outside',
-                tickcolor='black',
+                tickcolor=FOREGROUND_COLOR,
             ),
             zaxis=dict(
                 showbackground=False,
                 showgrid=True,
-                gridcolor="lightgray",
+                gridcolor=GRID_COLOR,
                 gridwidth=1,
                 showline=True,
-                linecolor='black',
+                linecolor=FOREGROUND_COLOR,
                 linewidth=2,
                 zeroline=False,
                 ticks='outside',
-                tickcolor='black',
+                tickcolor=FOREGROUND_COLOR,
             ),
         ),
         scene_camera=dict(
             projection=dict(type='orthographic')
         ),
 
-        plot_bgcolor="white",
-        paper_bgcolor="white",
+        plot_bgcolor=BACKGROUND_COLOR,
+        paper_bgcolor=BACKGROUND_COLOR,
     )
 
+    apply_plotly_style(fig)
     fig.show()

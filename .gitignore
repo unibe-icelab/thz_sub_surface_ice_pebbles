@@ -10,4 +10,7 @@
 *.ply
 *.csv
 *.bin
+*.thz
+*.thzimg
 /.venv/
+/legacy/

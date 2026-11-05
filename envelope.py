@@ -1,8 +1,15 @@
 import numpy as np
+from pathlib import Path
 from pydotthz import DotthzFile
 import matplotlib.pyplot as plt
 from scipy.signal import hilbert
 from scipy.ndimage import gaussian_filter1d
+from plot_style import FOREGROUND_COLOR, save_figure
+
+ROOT_DIR = Path(__file__).resolve().parent
+DATA_FILE = (ROOT_DIR / "data" / "envelope" / "measurements" / "sample_data" /
+             "resolution_target_sample.thzimg")
+RESULTS_DIR = ROOT_DIR / "results" / "envelope"
 
 def envelope_hilbert(x: np.ndarray, smooth_sigma: float | None = None) -> np.ndarray:
     """
@@ -60,7 +67,8 @@ def convolve1d(data: np.ndarray, kernel: np.ndarray) -> np.ndarray:
 
 
 if __name__ == "__main__":
-    with DotthzFile("sample_data/resolution_target_sample.thzimg") as f:
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    with DotthzFile(DATA_FILE) as f:
         data = np.array(f["Image"]["dataset"])
         time = np.array(f["Image"]["time"])
         print(data.shape, time.shape)
@@ -74,7 +82,7 @@ if __name__ == "__main__":
         convolved_data2 = convolve1d(np.abs(data[30, 30, :])**2, kernel)
 
         fig, ax1 = plt.subplots()
-        ax1.plot(time, data[30, 30, :], color="black", label="Original Signal")
+        ax1.plot(time, data[30, 30, :], color=FOREGROUND_COLOR, label="Original Signal")
         ax1.set_ylabel("Original Signal [nA]")
         ax1.set_xlabel("Time [ps]")
         ax1.set_ylim(-1000, 1000)
@@ -92,6 +100,6 @@ if __name__ == "__main__":
 
         plt.tight_layout()
 
-        plt.savefig("convolution_example.png", bbox_inches="tight")
-        plt.savefig("convolution_example.pdf", bbox_inches="tight")
+        save_figure(RESULTS_DIR / "convolution_example.png", bbox_inches="tight")
+        save_figure(RESULTS_DIR / "convolution_example.pdf", bbox_inches="tight")
         plt.show()

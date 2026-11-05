@@ -10,6 +10,19 @@ from thz_deconvolution import Deconvolution
 from envelope import convolve1d, gaussian_kernel1d
 from sklearn.mixture import GaussianMixture
 from pyhelper import unibe
+from plot_style import FOREGROUND_COLOR, apply_plot_style, save_figure
+
+ROOT_DIR = Path(__file__).resolve().parent
+MEASUREMENTS_DIR = ROOT_DIR / "data" / "estimate_noise" / "measurements"
+MEASUREMENTS = {
+    "coc_spheres_fine_scan_3": "COC_SPHERES_fine_scan_3",
+    "dust_surface_resolution_target_3d_4": "DUST_surface_res_target_3d_4",
+}
+
+ACTIVE_MEASUREMENT = "dust_surface_resolution_target_3d_4"
+DATA_DIR = MEASUREMENTS_DIR / MEASUREMENTS[ACTIVE_MEASUREMENT] / "data_image_rfl"
+PSF_DATA_DIR = ROOT_DIR / "data" / "psf"
+RESULTS_DIR = ROOT_DIR / "results" / "estimate_noise"
 
 params = {"ytick.color":
               "black",
@@ -36,6 +49,7 @@ params = {"ytick.color":
               16}
 
 plt.rcParams.update(params)
+apply_plot_style()
 
 
 def get_thz_file_from_path(path: Path):
@@ -83,7 +97,7 @@ class NoiseEstimator:
             x = np.linspace(0, np.max(data), 1000)
             log_x = np.log(x + 1e-12)
 
-            plt.hist(data, bins=60, density=True, alpha=0.25, edgecolor='black', label="Data")
+            plt.hist(data, bins=60, density=True, alpha=0.25, edgecolor=FOREGROUND_COLOR, label="Data")
 
             for i in range(self.n_components):
                 mu, sigma, w = log_means[i], log_stds[i], weights[i]
@@ -105,7 +119,7 @@ class NoiseEstimator:
             fig, axes = plt.subplots(ncols=2, figsize=(12, 6), gridspec_kw={'width_ratios': [4, 1.1]}, sharey=True)
 
             # Time-domain signal view
-            axes[0].plot(time, pulse, color="black", alpha=0.25, label="Pulse (band-pass)")
+            axes[0].plot(time, pulse, color=FOREGROUND_COLOR, alpha=0.25, label="Pulse (band-pass)")
             axes[0].plot(time, convolved_data, color=unibe.BLUE, label="Envelope")
             axes[0].axhline(threshold, color=unibe.RED, ls='--', label='Threshold')
             axes[0].set_xlabel("Time [ps]")
@@ -115,7 +129,7 @@ class NoiseEstimator:
             # Histogram view
             counts, bins, _ = axes[1].hist(
                 data, orientation="horizontal", bins=50,
-                density=True, alpha=0.2, edgecolor='black'
+                density=True, alpha=0.2, edgecolor=FOREGROUND_COLOR
             )
 
             # axes[1].set_xlim(axes[1].get_xlim()[::-1])
@@ -133,8 +147,9 @@ class NoiseEstimator:
             axes[1].legend()
 
             plt.tight_layout()
-            plt.savefig('noise_LNM_fit.pdf')
-            plt.savefig('noise_LNM_fit.png')
+            RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+            save_figure(RESULTS_DIR / 'noise_LNM_fit.pdf')
+            save_figure(RESULTS_DIR / 'noise_LNM_fit.png')
             plt.show()
 
         return threshold, (log_means, log_stds, weights)
@@ -170,7 +185,8 @@ class NoiseEstimator:
 
         if plot:
             # Plot histogram
-            counts, bins, _ = plt.hist(data, bins=50, density=True, alpha=0.2, color='black', edgecolor='black')
+            counts, bins, _ = plt.hist(data, bins=50, density=True, alpha=0.2,
+                                       color=FOREGROUND_COLOR, edgecolor=FOREGROUND_COLOR)
 
             # Plot GMM components
             x = np.linspace(0, np.max(data), 1000).reshape(-1, 1)
@@ -190,21 +206,22 @@ class NoiseEstimator:
             plt.ylabel('Density')
             plt.legend()
             plt.tight_layout()
-            plt.savefig('noise_GMM_fit.pdf')
-            plt.savefig('noise_GMM_fit.png')
+            RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+            save_figure(RESULTS_DIR / 'noise_GMM_fit.pdf')
+            save_figure(RESULTS_DIR / 'noise_GMM_fit.png')
             plt.show()
 
         if combined_plot:
 
             fig, axes = plt.subplots(ncols=2, figsize=(12, 6), gridspec_kw={'width_ratios': [4, 1]}, sharey=True)
 
-            axes[0].plot(time, pulse, color="black", alpha=0.25, label="Pulse, Band-Pass")
+            axes[0].plot(time, pulse, color=FOREGROUND_COLOR, alpha=0.25, label="Pulse, Band-Pass")
             axes[0].plot(time, convolved_data, color=unibe.BLUE, label="Gaussian Convolution")
             axes[0].axhline(threshold, color=unibe.RED, ls='--', label=r'Threshold $I_\text{th}$')
 
             # Plot histogram
             counts, bins, _ = axes[1].hist(data, orientation="horizontal", bins=50, density=True, alpha=0.2,
-                                           color='black', edgecolor='black')
+                                           color=FOREGROUND_COLOR, edgecolor=FOREGROUND_COLOR)
             axes[1].set_xlim(axes[1].get_xlim()[::-1])
 
             # Plot GMM components
@@ -237,21 +254,17 @@ class NoiseEstimator:
             axes[1].legend()
 
             plt.tight_layout()
-            plt.savefig('combined_noise_GMM_fit.pdf')
-            plt.savefig('combined_noise_GMM_fit.png')
+            RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+            save_figure(RESULTS_DIR / 'combined_noise_GMM_fit.pdf')
+            save_figure(RESULTS_DIR / 'combined_noise_GMM_fit.png')
             plt.show()
 
         return threshold, (means, stds, weights)
 
 
 if __name__ == "__main__":
-    path = Path("/Users/linus/Documents/COC_PEBBLE_CoDA_T1a_2/data_image_rfl")
-    path = Path("/Users/linus/Documents/COC_SPHERES_fine_scan_3/data_image_rfl")
-    path = Path("/Users/linus/Documents/DUST_surface_res_target_3d_4/data_image_rfl")
-    # path = Path("/Users/linus/Documents/COC_terrain_res_target_4c/data_image_rfl")
-    # path = Path("/Users/linus/Documents/COC_terrain_res_target_5_c_coarse/data_image_rfl")
-
-    path = get_thz_file_from_path(path)
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    path = get_thz_file_from_path(DATA_DIR)
 
     with DotthzFile(path) as psf_data:
         key = list(psf_data.keys())[0]
@@ -271,10 +284,11 @@ if __name__ == "__main__":
 
     traces = traces[::, ::, :]
 
-    # Decon = Deconvolution(psf_path=Path("psf_data/psf.npz"), low_cut=0.1, high_cut=5.0)
     Decon = Deconvolution(
-        knife_edge_x_path=Path("psf_data/example_beam_width/measurement_x/data/1750085285.8557956_data.thz"),
-        knife_edge_y_path=Path("psf_data/example_beam_width/measurement_y/data/1750163177.929295_data.thz"),
+        knife_edge_x_path=(PSF_DATA_DIR / "example_beam_width" / "measurement_x" / "data" /
+                           "1750085285.8557956_data.thz"),
+        knife_edge_y_path=(PSF_DATA_DIR / "example_beam_width" / "measurement_y" / "data" /
+                           "1750163177.929295_data.thz"),
         low_cut=1.0, high_cut=5.0)
 
     traces_old = traces
@@ -298,7 +312,7 @@ if __name__ == "__main__":
     threshold, components = Gmm.fit_lnmm_and_get_noise_threshold(convolved_data, time=time, pulse=pulse,
                                                                  std_multiplier=1, combined_plot=True)
 
-    # plt.plot(time, pulse, color="black", alpha=0.25, label="Pulse, Band-Pass")
+    # plt.plot(time, pulse, color=FOREGROUND_COLOR, alpha=0.25, label="Pulse, Band-Pass")
     # plt.plot(time, convolved_data, color=unibe.BLUE, label="Gaussian Convolution")
     # plt.axhline(threshold, color=unibe.RED, ls='--', label=f'Threshold $I_\text{th}$')
     #
@@ -306,6 +320,6 @@ if __name__ == "__main__":
     # plt.xlabel("Time [ps]")
     # plt.ylabel("Signal [nA]")
     # plt.tight_layout()
-    # plt.savefig('noise_threshold.pdf')
-    # plt.savefig('noise_threshold.png')
+    # save_figure(RESULTS_DIR / 'noise_threshold.pdf')
+    # save_figure(RESULTS_DIR / 'noise_threshold.png')
     # plt.show()
