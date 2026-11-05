@@ -47,7 +47,7 @@ plt.rcParams.update(params)
 
 
 def get_refraction_index(time, traces, t_ref, p_ref, window_half_width=15, win_func="hanning",
-                         min_frequency=0.2, max_frequency=3, d_mm=1.0, mask_radius=None):
+                         min_frequency=0.2, max_frequency=3, d_mm=1.0, mask_radius=None, mask_center_x=None, mask_center_y=None):
     """
     Compute refractive index map for all pixels in `traces`.
     This function first determines the frequency axis from the first valid pixel,
@@ -92,10 +92,14 @@ def get_refraction_index(time, traces, t_ref, p_ref, window_half_width=15, win_f
         for y in range(ny):
 
             if mask_radius:
+                if not mask_center_y:
+                    mask_center_y = 0
+                if not mask_center_x:
+                    mask_center_x = 0
 
                 mask_radius_mm = mask_radius * 1 / 0.5
 
-                if ((x - nx // 2) ** 2 + (y - ny // 2) ** 2) > mask_radius_mm ** 2:
+                if ((x - mask_center_x - nx // 2) ** 2 + (y - mask_center_y - ny // 2) ** 2) > mask_radius_mm ** 2:
                     continue
             trace = traces[x, y, :]
             p_pair = np.array([time, trace])
@@ -125,26 +129,41 @@ def get_refraction_index(time, traces, t_ref, p_ref, window_half_width=15, win_f
     return freq, refractive_index
 
 
+# plt.style.use('dark_background')
+
+
 if __name__ == "__main__":
-    ref_path = Path("/Users/linus/Documents/comet_dust_pellet_HESSO_silicon_ref_vac_3/data_image")
+    # ref_path = Path("/Users/linus/Documents/comet_dust_pellet_HESSO_silicon_ref_vac_3/data_image")
+    #
+    # path = get_thz_file_from_path(ref_path)
+    #
+    # with DotthzFile(path) as psf_data:
+    #     key = list(psf_data.keys())[0]
+    #     datasets = psf_data[key].datasets
+    #
+    #     # from the first dataset, extract the image:
+    #     t_ref = np.array(datasets["time"])
+    #     traces_ref = np.array(datasets["dataset"])
+    #
+    # p_ref = np.mean(traces_ref, axis=(0, 1))
 
-    path = get_thz_file_from_path(ref_path)
-
-    with DotthzFile(path) as psf_data:
-        key = list(psf_data.keys())[0]
-        datasets = psf_data[key].datasets
-
-        # from the first dataset, extract the image:
-        t_ref = np.array(datasets["time"])
-        traces_ref = np.array(datasets["dataset"])
-
-    p_ref = np.mean(traces_ref, axis=(0, 1))
+    ref_path = Path("/Users/linus/Documents/porosity_august2_2026_focused_silicon_reference/data/trans/single_pixel/1786972921.4414234_sp_data.thz")
+    with DotthzFile(ref_path) as ref_file:
+        sample = ref_file["Single Pixel 0"].datasets["Sample"][:]
+        t_ref = sample[:, 0]
+        p_ref = sample[:, 1]
 
     # SPIPA-B ICE, low res, 38 deg phase angle
     material, path = ("SPIPA-B", Path("/Users/linus/Documents/ICE_PEBBLE_CoDA_T3_dust_low_res_vac_trans_4/data_image"))
 
+    material, path = ("Frost", Path("/Users/linus/Documents/porosity_august2_2026_focused_frost_5.0mm_1.7g/data_image"))
+    material, path = ("Frost HR", Path("/Users/linus/Documents/porosity_august2_2026_hr_focused_frost_10.0mm_7.2g/data_image"))
+    # material, path = ("Frost UHR", Path("/Users/linus/Documents/porosity_august2_uhr_2026_focused_frost_10.0mm_7.2g/data_image"))
+    # material, path = ("Frost LR", Path("/Users/linus/Documents/porosity_august2_lr_2026_focused_frost_10.0mm_7.2g/data_image"))
+
+
     # solid ICE, low res, 38 deg phase angle
-    material, path = ("solid", Path("/Users/linus/Documents/ICE_PEBBLE_CoDA_T3_dust_low_res_vac_trans_5/data_image"))
+    # material, path = ("solid", Path("/Users/linus/Documents/ICE_PEBBLE_CoDA_T3_dust_low_res_vac_trans_5/data_image"))
 
     path = get_thz_file_from_path(path)
 
@@ -171,8 +190,8 @@ if __name__ == "__main__":
 
     plt.plot(times, traces[width // 2, height // 2, :])
     plt.plot(times, traces[width // 4, height // 4, :])
-    plt.plot(times, traces[48, 68, :])
-    plt.plot(times, traces[42, 60, :])
+    #plt.plot(times, traces[48, 68, :])
+    #plt.plot(times, traces[42, 60, :])
     plt.plot(t_ref, p_ref, color="black")
     plt.title("Example Trace Before Surface Extraction")
     plt.xlabel("Time (ps)")
@@ -181,8 +200,8 @@ if __name__ == "__main__":
 
     freqs, refractive_index = get_refraction_index(times, traces, t_ref, p_ref,
                                                    window_half_width=25, win_func="hanning",
-                                                   min_frequency=0.5, max_frequency=3, d_mm=12.0,
-                                                   mask_radius=25)
+                                                   min_frequency=0.5, max_frequency=3, d_mm=10.0,
+                                                   mask_radius=60, mask_center_x=-3, mask_center_y=-6)
 
     plt.plot(freqs, refractive_index[width // 2, height // 2, :])
     plt.show()
@@ -191,7 +210,7 @@ if __name__ == "__main__":
     cutoff = 2.1
     image[image > cutoff] = np.nan
     # image = refractive_index[:, :, np.round(freqs,2) == 0.5]
-    norm = Normalize(vmin=1, vmax=2)
+    norm = Normalize(vmin=1.0, vmax=1.5)
     plt.imshow(image, cmap=cm.managua, norm=norm, aspect="equal", extent=(0, x_max - x_min, 0, y_max - y_min))
     plt.colorbar(label='Refractive Index')
     plt.xlabel('X [mm]')
@@ -201,6 +220,6 @@ if __name__ == "__main__":
 
     plt.tight_layout()
     # plt.title('Average Refractive Index Map')
-    plt.savefig(f'pebble_transmission_{material}.png', dpi=300)
-    plt.savefig(f'pebble_transmission_{material}.pdf')
+    plt.savefig(f'pebble_transmission_{material}_inv.png', dpi=300)
+    plt.savefig(f'pebble_transmission_{material}_inv.pdf')
     plt.show()

@@ -16,6 +16,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from skimage.measure import marching_cubes
 
+
+plt.style.use('dark_background')
+
+
 if __name__ == "__main__":
     # COC solid, low res, 38 deg phase angle
     path = Path("/Users/linus/Documents/COC_PEBBLE_CoDA_T3_dust_low_res_vac_4/data_image_rfl")
@@ -40,12 +44,12 @@ if __name__ == "__main__":
     #     "/Users/linus/Documents/ICE_PEBBLE_SPHERE_CoDA_T3_dust_low_res_vac_10_fast_focus_on_sphere_top/data_image_rfl")
 
     # # SPIPA B, high res, 34 deg phase angle
-    path = Path(
-       "/Users/linus/Documents/ICE_PEBBLE_SPHERE_CoDA_T3_dust_high_res_vac_10_fast_focus_on_sphere_top/data_image_rfl")
+    # path = Path(
+    #    "/Users/linus/Documents/ICE_PEBBLE_SPHERE_CoDA_T3_dust_high_res_vac_10_fast_focus_on_sphere_top/data_image_rfl")
 
     # # empty control, low res, 34 deg phase angle
-    path = Path(
-         "/Users/linus/Documents/CONTROL_CoDA_T3_dust_low_res_vac_11_fast_focus_on_sphere_top/data_image_rfl")
+    # path = Path(
+    #      "/Users/linus/Documents/CONTROL_CoDA_T3_dust_low_res_vac_11_fast_focus_on_sphere_top/data_image_rfl")
 
     path = get_thz_file_from_path(path)
 
@@ -75,7 +79,7 @@ if __name__ == "__main__":
                               )
 
     mask_volume, spacing = extract_pebble(times, traces, dx, dy, x_min, x_max, width, y_min, y_max, height,
-                                          output_path=Path("./pebble_extraction"),
+                                          output_path=Path("./pebble_extraction_inv"),
                                           filename=path.stem,
                                           low_cut=0.2,
                                           high_cut=0.5,
@@ -216,7 +220,7 @@ if __name__ == "__main__":
             paper_bgcolor="white",
         )
 
-        fig.write_image(Path("./pebble_extraction").joinpath(f"{path.stem}_3D.pdf"))
+        fig.write_image(Path("./pebble_extraction_inv").joinpath(f"{path.stem}_3D.pdf"))
         fig.show()
     else:
 
@@ -259,9 +263,88 @@ if __name__ == "__main__":
 
         binary_mask = (volume_data >= 0.5).astype(float)
 
+        params = {
+            "ytick.color": "white",
+            "xtick.color": "white",
+            "axes.labelcolor": "white",
+            "axes.edgecolor": "white",
+            "mathtext.fontset": "cm",
+            "mathtext.rm": "Times New Roman",
+            "font.family": "Helvetica Neue",
+            "font.size": 18,
+        }
+        plt.rcParams.update(params)
+
         # --- Matplotlib 3D plot ---
         fig = plt.figure(figsize=(14, 8))
         ax = fig.add_subplot(111, projection='3d')
+
+        # Tick labels and ticks
+        ax.tick_params(colors='white', which='both')
+
+        # Axis label colors
+        ax.xaxis.label.set_color('white')
+        ax.yaxis.label.set_color('white')
+        ax.zaxis.label.set_color('white')
+
+        # Ensure ticks and labels are visible and white on all 3D axes
+        for axis in (ax.xaxis, ax.yaxis, ax.zaxis):
+            try:
+                axis.set_tick_params(which='both', colors='white', direction='out', length=6)
+            except Exception:
+                pass
+
+            # ticklines
+            for t in axis.get_ticklines():
+                try:
+                    t.set_color('white')
+                    t.set_markersize(6)
+                    t.set_visible(True)
+                except Exception:
+                    pass
+
+            # ticklabels
+            for lbl in axis.get_ticklabels():
+                try:
+                    lbl.set_color('white')
+                    lbl.set_fontsize(12)
+                    lbl.set_visible(True)
+                except Exception:
+                    pass
+
+        # Keep panes transparent, axis lines white and grid light gray
+        for axis in (ax.xaxis, ax.yaxis, ax.zaxis):
+            try:
+                if hasattr(axis, "set_pane_color"):
+                    axis.set_pane_color((1.0, 1.0, 1.0, 0.0))
+            except Exception:
+                pass
+            try:
+                if hasattr(axis, "line"):
+                    axis.line.set_color("white")
+            except Exception:
+                pass
+            try:
+                if hasattr(axis, "_axinfo"):
+                    axis._axinfo["grid"]["color"] = "lightgray"
+            except Exception:
+                pass
+
+        from matplotlib import rcParams
+
+        rcParams['xtick.color'] = 'white'
+        rcParams['ytick.color'] = 'white'
+        rcParams['axes.labelcolor'] = 'white'
+        rcParams['axes.edgecolor'] = 'white'
+
+        ax.xaxis.label.set_color('white')
+        ax.yaxis.label.set_color('white')
+        ax.zaxis.label.set_color('white')
+        ax.tick_params(axis='x', colors='white')  # only affects
+        ax.tick_params(axis='y', colors='white')  # tick labels
+        ax.tick_params(axis='z', colors='white')  # not tick marks
+
+        ax.grid(True, color='lightgray', linewidth=0.5)
 
         # Surface plot
         ax.plot_surface(X, Y, surface, cmap=cm.vik, edgecolor='none', alpha=1.0)
@@ -281,7 +364,7 @@ if __name__ == "__main__":
             tris = ax.plot_trisurf(
                 verts_mm[:, 0], verts_mm[:, 1], verts_mm[:, 2],
                 triangles=faces,
-                color=unibe.BLUE,
+                color="white",
                 alpha=1.0,
                 linewidth=0.1
             )
@@ -302,7 +385,7 @@ if __name__ == "__main__":
         ax.set_ylabel('Y [mm]', labelpad=20)
         ax.set_zlabel('Z [mm]', labelpad=8)
 
-        ax.tick_params(colors='black', direction='out', length=5)
+        ax.tick_params(colors='white', direction='out', length=5)
 
         ax.grid(True, color='lightgray', linewidth=0.5)
 
@@ -328,7 +411,10 @@ if __name__ == "__main__":
         ax.view_init(elev=18, azim=-30)
 
         # Save and show
-        plt.savefig(Path("./pebble_extraction").joinpath(f"{path.stem}_3D.pdf"), bbox_inches='tight', pad_inches=0.55,
+        plt.savefig(Path("./pebble_extraction_inv").joinpath(f"{path.stem}_3D.pdf"), bbox_inches='tight', pad_inches=0.55,
+                    # Optional: reduce padding
+                    )
+        plt.savefig(Path("./pebble_extraction_inv").joinpath(f"{path.stem}_3D.png"), dpi=600, bbox_inches='tight', pad_inches=0.55,
                     # Optional: reduce padding
                     )
         plt.show()

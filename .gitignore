@@ -1,0 +1,13 @@
+*.stl
+*.png
+*.jpg
+*.jpeg
+*.pdf
+*.npy
+*.npz
+*.tex
+*.svg
+*.ply
+*.csv
+*.bin
+/.venv/
