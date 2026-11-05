@@ -10,7 +10,7 @@ layers, noise thresholds, and transmission properties from THz measurements.
 For a new clone:
 
 ```bash
-git clone --recurse-submodules <repository-url> thz_sub_surface_ice_pebbles
+git clone --recurse-submodules https://github.com/unibe-icelab/thz_sub_surface_ice_pebbles thz_sub_surface_ice_pebbles
 cd thz_sub_surface_ice_pebbles
 ```
 
