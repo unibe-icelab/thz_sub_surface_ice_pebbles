@@ -13,6 +13,7 @@ dependencies = [
     "scikit-image>=0.26.0",
     "scikit-learn>=1.9.1",
     "scipy>=1.18.1",
+    "shapely>=2.1.2",
     "thz-deconvolution>=1.1.1",
     "thzpy>=0.2.1",
     "tqdm>=4.70.1",

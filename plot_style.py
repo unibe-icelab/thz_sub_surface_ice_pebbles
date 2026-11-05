@@ -15,6 +15,50 @@ FOREGROUND_COLOR = "white" if PLOT_BACKGROUND == "black" else "black"
 PEBBLE_COLOR = "white" if PLOT_BACKGROUND == "black" else unibe.BLUE
 GRID_COLOR = "#777777" if PLOT_BACKGROUND == "black" else "#d3d3d3"
 
+# Material colors used by the original HESSO pellet comparison plots. CI uses
+# the foreground color so the same curve remains visible in both themes.
+MATERIAL_COLORS = {
+    "PTFE": "gray",
+    "SiO2": "cyan",
+    "Charcoal": "violet",
+    "CoDA-T0": "blue",
+    "CoDA-T1": "pink",
+    "CoDA-T2": "yellow",
+    "CoDA-T3": "orange",
+    "CI": FOREGROUND_COLOR,
+    "Forsterite": "green",
+    "Fayalite": "red",
+    "Juniper charcoal": "brown",
+    "Juniper_charcoal": "brown",
+}
+
+# Exact mapping used by the historical combined_properties_selection figure.
+# These are Matplotlib's tab10 colors, pinned by material instead of depending
+# on the order returned by os.listdir().
+SELECTION_MATERIAL_COLORS = {
+    "Forsterite": "#ff7f0e",
+    "Charcoal": "#2ca02c",
+    "CI": "#d62728",
+    "SiO2": "#9467bd",
+    "CoDA-T1": "#8c564b",
+    "CoDA-T0": "#e377c2",
+    "PTFE": "#7f7f7f",
+    "Juniper charcoal": "#bcbd22",
+    "Juniper_charcoal": "#bcbd22",
+    "CoDA-T2": "#17becf",
+    "CoDA-T3": "#1f77b4",
+}
+
+
+def material_color(name, fallback=None):
+    """Return the stable legacy color assigned to a measured material."""
+    return MATERIAL_COLORS.get(name, fallback)
+
+
+def selection_material_color(name, fallback=None):
+    """Return the color used by the historical combined-selection figure."""
+    return SELECTION_MATERIAL_COLORS.get(name, fallback)
+
 
 def apply_plot_style():
     """Apply the selected background and readable foreground to Matplotlib."""

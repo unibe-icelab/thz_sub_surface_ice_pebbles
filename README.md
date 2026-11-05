@@ -59,6 +59,13 @@ thz_sub_surface_ice_pebbles/
 │   ├── estimate_noise/
 │   ├── full_3d_analysis/
 │   ├── layer_detection/
+│   ├── material_properties/
+│   │   ├── metadata/
+│   │   │   ├── calculated_data.json
+│   │   │   ├── pellets_meta_analysis.json
+│   │   │   └── sub_pellets_meta_analysis.json
+│   │   ├── raw/
+│   │   └── *_data.npy
 │   ├── psf/
 │   ├── sub_surface_extraction/
 │   ├── surface_extraction/
@@ -84,6 +91,52 @@ PLOT_BACKGROUND = "white"  # or "black"
 
 Generated figures and other analysis artifacts are written below `results/`.
 
+### Material-property workflow
+
+Rebuild the processed material arrays from the raw pellet measurements and the
+metadata in `data/material_properties/metadata/` with:
+
+```bash
+uv run python analyse_material_properties.py
+```
+
+The script validates every raw path before starting and lists all missing
+measurements if the downloaded data archive is incomplete. It writes processed
+arrays to `data/material_properties/` and analysis plots to
+`results/material_properties/raw_analysis/`.
+
+Generate the publication-style selected-material plots from those processed
+arrays with:
+
+```bash
+uv run python plot_material_properties.py
+```
+
+Solve the two-component SiO2/CI Bruggeman mixture against measured CoDA-T2
+with:
+
+```bash
+uv run python compare_dust_hesso_pellets_emt.py
+```
+
+This reproduces the historical HESSO pellet comparison, evaluates the mixture
+at the original selected frequency index, and writes figures plus
+`sio2_ci_coda_t2_solution.json` to
+`results/material_properties/mixture_analysis/`.
+
+The material-property data files are:
+
+| Path | Contents |
+| --- | --- |
+| `data/material_properties/raw/` | Complete raw measurement directories, including THz, CSV, PNG, and PDF acquisition files. |
+| `data/material_properties/metadata/pellets_meta_analysis.json` | Host, clear-space, thickness, volume, density, and raw-path metadata for PTFE and the original dust pellets. |
+| `data/material_properties/metadata/sub_pellets_meta_analysis.json` | Equivalent metadata for T0, T3, juniper charcoal, and related sub-pellets. |
+| `data/material_properties/metadata/calculated_data.json` | Derived thickness, sample-volume, and density values used by the historical mixture script. |
+| `data/material_properties/*_data.npy` | Five-column processed caches used by `plot_material_properties.py`. |
+| `results/material_properties/raw_analysis/` | Figures regenerated directly from raw measurements and metadata. |
+| `results/material_properties/mixture_analysis/` | HESSO comparison figures, SiO2/CI fraction scan, and solved mixture JSON. |
+| `results/material_properties/` | Publication-style material-selection PDFs and PNGs. |
+
 ## Active Python files
 
 | File | Purpose |
@@ -92,6 +145,10 @@ Generated figures and other analysis artifacts are written below `results/`.
 | `estimate_noise.py` | Fits mixture models to signal amplitudes and estimates noise thresholds. |
 | `full_3d_analysis.py` | Combines surface extraction and subsurface segmentation into a rendered 3D measurement view. |
 | `layer_detection.py` | Produces annotated B-scan layer figures for COC and ice measurements. |
+| `analyse_material_properties.py` | Rebuilds material-property arrays and plots from raw pellet measurements and local metadata JSON files. |
+| `compare_dust_hesso_pellets_emt.py` | Reproduces the HESSO effective-medium comparisons and solves the SiO2/CI mixture against CoDA-T2. |
+| `emt.py` | Implements the effective-medium model used by the raw material-property analysis. |
+| `plot_material_properties.py` | Recreates the selected cometary-dust analogue optical-property plots from processed arrays in `data/material_properties/`. |
 | `plot_style.py` | Defines the shared white/black plot theme, export colors, and save helpers. |
 | `scicolorscales.py` | Supplies scientific color scales used by Plotly figures. |
 | `sub_surface_extraction.py` | Deconvolves THz image data and segments subsurface pebble volumes. |
