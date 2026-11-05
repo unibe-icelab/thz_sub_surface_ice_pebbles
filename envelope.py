@@ -56,13 +56,23 @@ def gaussian_kernel1d(sigma: float, radius: int) -> np.ndarray:
     kernel /= kernel.sum()
     return kernel
 
-def convolve1d(data: np.ndarray, kernel: np.ndarray) -> np.ndarray:
+def convolve1d(
+    data: np.ndarray,
+    kernel: np.ndarray,
+    *,
+    normalize: bool = False,
+) -> np.ndarray:
     """
     Fast convolution using scipy's optimized implementation.
-    Drop-in replacement for the original manual loop implementation.
+    Set ``normalize=True`` to scale the result to a maximum of one. Analysis
+    callers retain absolute amplitudes by default.
     """
     output = convolve(data, kernel, mode='same')
-    return output # / np.max(output)
+    if normalize:
+        maximum = np.max(output)
+        if maximum > 0:
+            output = output / maximum
+    return output
 
 
 
@@ -78,8 +88,8 @@ if __name__ == "__main__":
         sigma = int(pulse_width / 3 / dt)
         print(sigma)
         kernel = gaussian_kernel1d(sigma=sigma, radius=sigma*3)
-        convolved_data = convolve1d(np.abs(data[30, 30, :]), kernel)
-        convolved_data2 = convolve1d(np.abs(data[30, 30, :])**2, kernel)
+        convolved_data = convolve1d(np.abs(data[30, 30, :]), kernel, normalize=True)
+        convolved_data2 = convolve1d(np.abs(data[30, 30, :])**2, kernel, normalize=True)
 
         fig, ax1 = plt.subplots()
         ax1.plot(time, data[30, 30, :], color=FOREGROUND_COLOR, label="Original Signal")

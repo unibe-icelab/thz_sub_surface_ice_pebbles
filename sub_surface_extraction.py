@@ -142,6 +142,7 @@ def extract_pebble(times, traces, dx, dy, x_min, x_max, width, y_min, y_max, hei
         cbar = fig.colorbar(im, cax=cax)
         cbar.set_label("Intensity [a.u.]")
 
+        fig.tight_layout()
         save_figure(output_path.joinpath(f"{filename}_raw_b_scan.png"), dpi=300)
         save_figure(output_path.joinpath(f"{filename}_raw_b_scan.pdf"))
         plt.show()
@@ -152,7 +153,7 @@ def extract_pebble(times, traces, dx, dy, x_min, x_max, width, y_min, y_max, hei
     traces = traces[::, ::, :]
     times = times[:]
 
-    surface_b_scan = surface[h // 2, :]
+    surface_b_scan = surface[h // 2, :] if surface is not None else None
 
 
     b_scan_convolved = np.zeros_like(b_scan)
@@ -231,6 +232,7 @@ def extract_pebble(times, traces, dx, dy, x_min, x_max, width, y_min, y_max, hei
         cbar = fig.colorbar(im, cax=cax)
         cbar.set_label("Intensity [a.u.]")
 
+        fig.tight_layout()
         save_figure(output_path.joinpath(f"{filename}_filtered_b_scan.png"), dpi=300)
         save_figure(output_path.joinpath(f"{filename}_filtered_b_scan.pdf"))
         plt.show()
@@ -275,7 +277,7 @@ def extract_pebble(times, traces, dx, dy, x_min, x_max, width, y_min, y_max, hei
             Rectangle((b_scan.shape[0] * spacing_x - rim_width_r, 0), rim_width_r, height_mm, color='white', zorder=2,
                       alpha=0.7))
 
-
+        fig.tight_layout()
         save_figure(output_path.joinpath(f"{filename}_masked_b_scan.png"), dpi=300)
         save_figure(output_path.joinpath(f"{filename}_masked_b_scan.pdf"))
         plt.show()
