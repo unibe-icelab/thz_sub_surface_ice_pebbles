@@ -1,4 +1,4 @@
-# python
+import os
 from pathlib import Path
 
 from cmcrameri import cm
@@ -19,27 +19,70 @@ import pyvista as pv
 import numpy as np
 from skimage.measure import marching_cubes
 from plot_style import FOREGROUND_COLOR, apply_plot_style, save_figure
+from capsule_paths import DATA_ROOT, RESULTS_ROOT
 
-ROOT_DIR = Path(__file__).resolve().parent
-MEASUREMENTS_DIR = ROOT_DIR / "data" / "transmission_pebble" / "measurements"
+MEASUREMENTS_DIR = DATA_ROOT / "transmission_pebble" / "measurements"
 MEASUREMENTS = {
-    "solid_ice_pebble": ("SOLID", "ICE_PEBBLE_CoDA_T3_dust_low_res_vac_trans_5"), # SPIPA-B ICE, low res, 38 deg phase angle
-    "spipa_b_pebble": ("Spipa-B", "ICE_PEBBLE_CoDA_T3_dust_low_res_vac_trans_4"), # low res, 38 deg phase angle
+    "solid_ice_pebble": {
+        "material": "solid",
+        "directory": "ICE_PEBBLE_CoDA_T3_dust_low_res_vac_trans_5",
+        "reference": "comet_dust_image_mean",
+        "d_mm": 10.0,
+        "mask_radius": 25,
+        "mask_center_x": -3,
+        "mask_center_y": -6,
+        "vmin": 1.0,
+        "vmax": 2.0,
+    },
+    "spipa_b_pebble": {
+        "material": "SPIPA-B",
+        "directory": "ICE_PEBBLE_CoDA_T3_dust_low_res_vac_trans_4",
+        "reference": "comet_dust_image_mean",
+        "d_mm": 10.0,
+        "mask_radius": 25,
+        "mask_center_x": -3,
+        "mask_center_y": -6,
+        "vmin": 1.0,
+        "vmax": 2.0,
+    },
+    "frost_hr": {
+        "material": "Frost HR",
+        "directory": "porosity_august2_2026_hr_focused_frost_10.0mm_7.2g",
+        "reference": "frost_single_pixel",
+        "d_mm": 10.0,
+        "mask_radius": 60,
+        "mask_center_x": -3,
+        "mask_center_y": -6,
+        "vmin": 1.0,
+        "vmax": 1.5,
+    },
 }
-
-ACTIVE_MEASUREMENT = "solid_ice_pebble"
-MATERIAL, measurement_directory = MEASUREMENTS[ACTIVE_MEASUREMENT]
-DATA_DIR = MEASUREMENTS_DIR / measurement_directory / "data_image"
 
 REFERENCES = {
     "comet_dust_image_mean": (
         "image_mean",
         MEASUREMENTS_DIR / "comet_dust_pellet_HESSO_silicon_ref_vac_3" / "data_image",
     ),
+    "frost_single_pixel": (
+        "single_pixel",
+        MEASUREMENTS_DIR
+        / "porosity_august2_2026_focused_silicon_reference"
+        / "data"
+        / "trans"
+        / "single_pixel"
+        / "1786972921.4414234_sp_data.thz",
+    ),
 }
-ACTIVE_REFERENCE = "comet_dust_image_mean"
-REFERENCE_MODE, REFERENCE_PATH = REFERENCES[ACTIVE_REFERENCE]
-RESULTS_DIR = ROOT_DIR / "results" / "transmission_pebble"
+
+ACTIVE_MEASUREMENT = os.environ.get(
+    "THZ_ACTIVE_MEASUREMENT",
+    "solid_ice_pebble",
+)
+CONFIG = MEASUREMENTS[ACTIVE_MEASUREMENT]
+MATERIAL = CONFIG["material"]
+DATA_DIR = MEASUREMENTS_DIR / CONFIG["directory"] / "data_image"
+REFERENCE_MODE, REFERENCE_PATH = REFERENCES[CONFIG["reference"]]
+RESULTS_DIR = RESULTS_ROOT / "transmission_pebble"
 
 params = {"ytick.color":
               "black",
@@ -217,8 +260,11 @@ if __name__ == "__main__":
 
     freqs, refractive_index = get_refraction_index(times, traces, t_ref, p_ref,
                                                    window_half_width=25, win_func="hanning",
-                                                   min_frequency=0.5, max_frequency=3, d_mm=10.0,
-                                                   mask_radius=25, mask_center_x=-3, mask_center_y=-6)
+                                                   min_frequency=0.5, max_frequency=3,
+                                                   d_mm=CONFIG["d_mm"],
+                                                   mask_radius=CONFIG["mask_radius"],
+                                                   mask_center_x=CONFIG["mask_center_x"],
+                                                   mask_center_y=CONFIG["mask_center_y"])
 
     # plt.plot(freqs, refractive_index[width // 2, height // 2, :])
     # plt.tight_layout()
@@ -228,7 +274,7 @@ if __name__ == "__main__":
     cutoff = 2.1
     image[image > cutoff] = np.nan
     # image = refractive_index[:, :, np.round(freqs,2) == 0.5]
-    norm = Normalize(vmin=1.0, vmax=2.0)
+    norm = Normalize(vmin=CONFIG["vmin"], vmax=CONFIG["vmax"])
     plt.imshow(image, cmap=cm.managua, norm=norm, aspect="equal", extent=(0, x_max - x_min, 0, y_max - y_min))
     plt.colorbar(label='Refractive Index')
     plt.xlabel('X [mm]')

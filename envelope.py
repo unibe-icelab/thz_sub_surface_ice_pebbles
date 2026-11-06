@@ -5,11 +5,11 @@ import matplotlib.pyplot as plt
 from scipy.signal import hilbert
 from scipy.ndimage import gaussian_filter1d
 from plot_style import FOREGROUND_COLOR, save_figure
+from capsule_paths import DATA_ROOT, RESULTS_ROOT
 
-ROOT_DIR = Path(__file__).resolve().parent
-DATA_FILE = (ROOT_DIR / "data" / "envelope" / "measurements" / "sample_data" /
+DATA_FILE = (DATA_ROOT / "envelope" / "measurements" / "sample_data" /
              "resolution_target_sample.thzimg")
-RESULTS_DIR = ROOT_DIR / "results" / "envelope"
+RESULTS_DIR = RESULTS_ROOT / "envelope"
 
 def envelope_hilbert(x: np.ndarray, smooth_sigma: float | None = None) -> np.ndarray:
     """

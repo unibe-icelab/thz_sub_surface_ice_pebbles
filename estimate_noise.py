@@ -11,9 +11,9 @@ from envelope import convolve1d, gaussian_kernel1d
 from sklearn.mixture import GaussianMixture
 from pyhelper import unibe
 from plot_style import FOREGROUND_COLOR, apply_plot_style, save_figure
+from capsule_paths import DATA_ROOT, RESULTS_ROOT
 
-ROOT_DIR = Path(__file__).resolve().parent
-MEASUREMENTS_DIR = ROOT_DIR / "data" / "estimate_noise" / "measurements"
+MEASUREMENTS_DIR = DATA_ROOT / "estimate_noise" / "measurements"
 MEASUREMENTS = {
     "coc_spheres_fine_scan_3": "COC_SPHERES_fine_scan_3",
     "dust_surface_resolution_target_3d_4": "DUST_surface_res_target_3d_4",
@@ -21,8 +21,8 @@ MEASUREMENTS = {
 
 ACTIVE_MEASUREMENT = "dust_surface_resolution_target_3d_4"
 DATA_DIR = MEASUREMENTS_DIR / MEASUREMENTS[ACTIVE_MEASUREMENT] / "data_image_rfl"
-PSF_DATA_DIR = ROOT_DIR / "data" / "psf"
-RESULTS_DIR = ROOT_DIR / "results" / "estimate_noise"
+PSF_DATA_DIR = DATA_ROOT / "psf"
+RESULTS_DIR = RESULTS_ROOT / "estimate_noise"
 
 params = {"ytick.color":
               "black",

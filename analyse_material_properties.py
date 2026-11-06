@@ -17,11 +17,12 @@ import re
 from emt import compute_bruggeman_n_eff
 from plot_style import material_color, save_figure
 from pyhelper import unibe
+from capsule_paths import CODE_ROOT, DATA_ROOT, MATERIAL_CACHE_ROOT, RESULTS_ROOT
 
-PROJECT_ROOT = Path(__file__).resolve().parent
-DATA_DIR = PROJECT_ROOT / "data" / "material_properties"
+PROJECT_ROOT = CODE_ROOT
+DATA_DIR = DATA_ROOT / "material_properties"
 METADATA_DIR = DATA_DIR / "metadata"
-RESULTS_DIR = PROJECT_ROOT / "results" / "material_properties" / "raw_analysis"
+RESULTS_DIR = RESULTS_ROOT / "material_properties" / "raw_analysis"
 RAW_DATA_DIR = DATA_DIR / "raw"
 
 
@@ -32,6 +33,8 @@ def project_path(value: str | Path) -> Path:
         return path
     if len(path.parts) == 1:
         return RAW_DATA_DIR / path
+    if path.parts and path.parts[0] == "data":
+        return DATA_ROOT.joinpath(*path.parts[1:])
     return PROJECT_ROOT / path
 
 
@@ -864,9 +867,9 @@ def plot_material_averages(results: list, label: str, files: Optional[list] = No
             d["n_real_std"]
         ))
 
-        # Save as .npy file
-        DATA_DIR.mkdir(parents=True, exist_ok=True)
-        np.save(DATA_DIR / f"{safe_name}_data.npy", data_to_save)
+        # Save regenerated caches outside the read-only Code Ocean data mount.
+        MATERIAL_CACHE_ROOT.mkdir(parents=True, exist_ok=True)
+        np.save(MATERIAL_CACHE_ROOT / f"{safe_name}_data.npy", data_to_save)
 
         ax2 = ax1.twinx()
         l2 = ax2.plot(f, n_real, color=color_n, label=r"Refractive index $n$")

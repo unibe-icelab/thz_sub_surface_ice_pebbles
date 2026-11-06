@@ -14,12 +14,13 @@ import numpy as np
 
 from emt import bruggeman_eps_eff, solve_v_i_two_component
 from plot_style import FOREGROUND_COLOR, material_color, save_figure
+from capsule_paths import DATA_ROOT, RESULTS_ROOT
 
 PROJECT_ROOT = Path(__file__).resolve().parent
-DATA_DIR = PROJECT_ROOT / "data" / "material_properties"
+DATA_DIR = DATA_ROOT / "material_properties"
 RAW_DATA_DIR = DATA_DIR / "raw"
 METADATA_PATH = DATA_DIR / "metadata" / "calculated_data.json"
-RESULTS_DIR = PROJECT_ROOT / "results" / "material_properties" / "mixture_analysis"
+RESULTS_DIR = RESULTS_ROOT / "material_properties" / "mixture_analysis"
 
 
 def save_result(filename: str) -> None:

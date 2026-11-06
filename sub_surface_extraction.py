@@ -28,10 +28,10 @@ from plot_style import (
     apply_plotly_style,
     save_figure,
 )
+from capsule_paths import DATA_ROOT, RESULTS_ROOT
 
-ROOT_DIR = Path(__file__).resolve().parent
-PSF_DATA_DIR = ROOT_DIR / "data" / "psf"
-MEASUREMENTS_DIR = ROOT_DIR / "data" / "sub_surface_extraction" / "measurements"
+PSF_DATA_DIR = DATA_ROOT / "psf"
+MEASUREMENTS_DIR = DATA_ROOT / "sub_surface_extraction" / "measurements"
 MEASUREMENTS = {
     "solid_low_res_34deg": "ICE_PEBBLE_SPHERE_CoDA_T3_dust_low_res_vac_9_fast_focus_on_sohere_top",
     "spipa_b_high_res_34deg": "ICE_PEBBLE_SPHERE_CoDA_T3_dust_high_res_vac_10_fast_focus_on_sphere_top",
@@ -41,7 +41,7 @@ MEASUREMENTS = {
 
 ACTIVE_MEASUREMENT = "empty_control_low_res_34deg"
 EXAMPLE_DATA_DIR = MEASUREMENTS_DIR / MEASUREMENTS[ACTIVE_MEASUREMENT] / "data_image_rfl"
-EXAMPLE_RESULTS_DIR = ROOT_DIR / "results" / "sub_surface_extraction"
+EXAMPLE_RESULTS_DIR = RESULTS_ROOT / "sub_surface_extraction"
 
 params = {"ytick.color":
               "black",

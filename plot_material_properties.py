@@ -14,11 +14,12 @@ from matplotlib import pyplot as plt
 
 from plot_style import save_figure, selection_material_color
 from pyhelper import unibe
+from capsule_paths import MATERIAL_CACHE_ROOT, RESULTS_ROOT
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
-DATA_DIR = PROJECT_ROOT / "data" / "material_properties"
-RESULTS_DIR = PROJECT_ROOT / "results" / "material_properties"
+DATA_DIR = MATERIAL_CACHE_ROOT
+RESULTS_DIR = RESULTS_ROOT / "material_properties"
 
 # Display name, input stem, and requested output stem.
 INDIVIDUAL_MATERIALS = (

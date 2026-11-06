@@ -77,6 +77,44 @@ thz_sub_surface_ice_pebbles/
 The scripts use project-relative paths and do not require the data to remain in
 the original acquisition locations.
 
+## Code Ocean
+
+Place all tracked repository files, including the initialized `pyhelper`
+submodule, in `/code`. Upload the **contents** of the local `data/` directory
+to `/data` so that, for example, the envelope input is available below
+`/data/envelope/` rather than `/data/data/envelope/`.
+
+Configure the capsule with Python 3.14 and install the locked environment
+during its build step:
+
+```bash
+uv sync --locked
+```
+
+The Linux image also needs the OpenGL runtime libraries required by
+VTK/PyVista (`libgl1`, `libxrender1`, `libxext6`, and `libsm6`). Then set
+`/code/run.sh` as the executable run entry point. It runs headlessly, writes
+temporary caches to `/scratch`, writes generated artifacts to `/results`, and
+checks that all 155 filenames present in `/data/plots` were recreated.
+
+The path behavior is controlled by `capsule_paths.py` and these optional
+environment variables:
+
+| Variable | Code Ocean value | Local default |
+| --- | --- | --- |
+| `THZ_DATA_ROOT` | `/data` | `<repository>/data` |
+| `THZ_RESULTS_ROOT` | `/results` | `<repository>/results` |
+| `THZ_SCRATCH_ROOT` | `/scratch` | `<repository>/.scratch` |
+| `THZ_MATERIAL_CACHE_ROOT` | `/scratch/material_properties` | `<repository>/data/material_properties` |
+
+The material-property cache is separated from the raw input because the Code
+Ocean `/data` mount is treated as read-only.
+
+`run.sh` also searches below `/data` for the required marker file when Code
+Ocean mounts an attached data asset in a named subdirectory. The uploaded data
+must be extracted; an archive such as `/data/data.zip` is not expanded during
+the reproducible run.
+
 ## Configuration
 
 Most analysis scripts define a `MEASUREMENTS` mapping near the top of the file.

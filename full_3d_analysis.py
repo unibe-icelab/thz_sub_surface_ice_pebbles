@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 from cmcrameri import cm
@@ -24,28 +25,56 @@ from plot_style import (
     apply_plotly_style,
     save_figure,
 )
+from capsule_paths import DATA_ROOT, RESULTS_ROOT
 
 apply_plot_style()
 
-ROOT_DIR = Path(__file__).resolve().parent
-MEASUREMENTS_DIR = ROOT_DIR / "data" / "full_3d_analysis" / "measurements"
 MEASUREMENTS = {
-    "solid_pebble_low_res_1": "ICE_PEBBLE_SPHERE_CoDA_T3_dust_low_res_vac_7_fast_focus_on_sohere_top",
+    "coc_cube_low_res": (
+        DATA_ROOT / "layer_detection" / "measurements" /
+        "COC_PEBBLE_CoDA_T3_dust_low_res_vac_4"
+    ),
+    "ice_cube_tilted": (
+        DATA_ROOT / "layer_detection" / "measurements" /
+        "ICE_PEBBLE_CoDA_T3_dust_low_res_vac_6_small_fov_slow"
+    ),
+    "solid_pebble_low_res_1": (
+        DATA_ROOT / "full_3d_analysis" / "measurements" /
+        "ICE_PEBBLE_SPHERE_CoDA_T3_dust_low_res_vac_7_fast_focus_on_sohere_top"
+    ),
     # 38 deg phase angle
-    "solid_pebble_low_res_2": "ICE_PEBBLE_SPHERE_CoDA_T3_dust_low_res_vac_9_fast_focus_on_sohere_top",
+    "solid_pebble_low_res_2": (
+        DATA_ROOT / "full_3d_analysis" / "measurements" /
+        "ICE_PEBBLE_SPHERE_CoDA_T3_dust_low_res_vac_9_fast_focus_on_sohere_top"
+    ),
     # 34 deg phase angle
-    "solid_ice_pebble": "ICE_PEBBLE_SPHERE_CoDA_T3_dust_high_res_vac_9_fast_focus_on_sohere_top",  # 34 deg phase angle
-    "spipa_b_pebble_low_res": "ICE_PEBBLE_SPHERE_CoDA_T3_dust_low_res_vac_10_fast_focus_on_sphere_top",
+    "solid_ice_pebble": (
+        DATA_ROOT / "full_3d_analysis" / "measurements" /
+        "ICE_PEBBLE_SPHERE_CoDA_T3_dust_high_res_vac_9_fast_focus_on_sohere_top"
+    ),
+    "spipa_b_pebble_low_res": (
+        DATA_ROOT / "full_3d_analysis" / "measurements" /
+        "ICE_PEBBLE_SPHERE_CoDA_T3_dust_low_res_vac_10_fast_focus_on_sphere_top"
+    ),
     # 34 deg phase angle
-    "spipa_b_pebble": "ICE_PEBBLE_SPHERE_CoDA_T3_dust_high_res_vac_10_fast_focus_on_sphere_top",
+    "spipa_b_pebble": (
+        DATA_ROOT / "full_3d_analysis" / "measurements" /
+        "ICE_PEBBLE_SPHERE_CoDA_T3_dust_high_res_vac_10_fast_focus_on_sphere_top"
+    ),
     # 34 deg phase angle
-    "empty_control": "CONTROL_CoDA_T3_dust_low_res_vac_11_fast_focus_on_sphere_top",  # 34 deg phase angle
+    "empty_control": (
+        DATA_ROOT / "full_3d_analysis" / "measurements" /
+        "CONTROL_CoDA_T3_dust_low_res_vac_11_fast_focus_on_sphere_top"
+    ),
 }
 
-# Change this key to select any of the locally copied measurements above.
-ACTIVE_MEASUREMENT = "solid_ice_pebble"
-DATA_DIR = MEASUREMENTS_DIR / MEASUREMENTS[ACTIVE_MEASUREMENT] / "data_image_rfl"
-RESULTS_DIR = ROOT_DIR / "results" / "full_3d_analysis"
+# Change this key or set THZ_ACTIVE_MEASUREMENT to select a measurement.
+ACTIVE_MEASUREMENT = os.environ.get(
+    "THZ_ACTIVE_MEASUREMENT",
+    "solid_ice_pebble",
+)
+DATA_DIR = MEASUREMENTS[ACTIVE_MEASUREMENT] / "data_image_rfl"
+RESULTS_DIR = RESULTS_ROOT / "full_3d_analysis"
 
 if __name__ == "__main__":
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)

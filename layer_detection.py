@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 from cmcrameri import cm
@@ -13,10 +14,10 @@ from envelope import gaussian_kernel1d, convolve1d
 from plot_style import FOREGROUND_COLOR, apply_plot_style, save_figure
 from pyhelper import unibe
 from surface_extraction import get_thz_file_from_path, extract_surface, get_thickness
+from capsule_paths import DATA_ROOT, RESULTS_ROOT
 
 
-ROOT_DIR = Path(__file__).resolve().parent
-MEASUREMENTS_DIR = ROOT_DIR / "data" / "layer_detection" / "measurements"
+MEASUREMENTS_DIR = DATA_ROOT / "layer_detection" / "measurements"
 MEASUREMENTS = {
     "coc": ("COC_PEBBLE_CoDA_T3_dust_low_res_vac_4", "COC", False),
     "coc_tilted": ("COC_PEBBLE_CoDA_T3_dust_low_res_vac_5", "COC", True),
@@ -25,11 +26,11 @@ MEASUREMENTS = {
 }
 
 # Change this key to select one of the four locally copied measurements above.
-ACTIVE_MEASUREMENT = "coc"
+ACTIVE_MEASUREMENT = os.environ.get("THZ_ACTIVE_MEASUREMENT", "coc")
 measurement_directory, MATERIAL, TILTED = MEASUREMENTS[ACTIVE_MEASUREMENT]
 DATA_DIR = MEASUREMENTS_DIR / measurement_directory / "data_image_rfl"
-PSF_DATA_DIR = ROOT_DIR / "data" / "psf" / "example_beam_width"
-RESULTS_DIR = ROOT_DIR / "results" / "layer_detection"
+PSF_DATA_DIR = DATA_ROOT / "psf" / "example_beam_width"
+RESULTS_DIR = RESULTS_ROOT / "layer_detection"
 
 
 params = {

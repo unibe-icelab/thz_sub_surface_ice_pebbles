@@ -16,17 +16,17 @@ from scipy.ndimage import median_filter, gaussian_filter
 from thz_deconvolution import Deconvolution
 from envelope import gaussian_kernel1d, convolve1d, envelope_hilbert
 from estimate_noise import NoiseEstimator
+from capsule_paths import DATA_ROOT, RESULTS_ROOT
 
-ROOT_DIR = Path(__file__).resolve().parent
-PSF_DATA_DIR = ROOT_DIR / "data" / "psf"
-MEASUREMENTS_DIR = ROOT_DIR / "data" / "surface_extraction" / "measurements"
+PSF_DATA_DIR = DATA_ROOT / "psf"
+MEASUREMENTS_DIR = DATA_ROOT / "surface_extraction" / "measurements"
 MEASUREMENTS = {
     "coc_spheres_fine_scan_3": "COC_SPHERES_fine_scan_3",
 }
 
 ACTIVE_MEASUREMENT = "coc_spheres_fine_scan_3"
 EXAMPLE_DATA_DIR = MEASUREMENTS_DIR / MEASUREMENTS[ACTIVE_MEASUREMENT] / "data_image_rfl"
-EXAMPLE_RESULTS_DIR = ROOT_DIR / "results" / "surface_extraction"
+EXAMPLE_RESULTS_DIR = RESULTS_ROOT / "surface_extraction"
 
 
 def get_dynamic_range(data, percentile=0.999):
