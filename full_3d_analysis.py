@@ -1,4 +1,4 @@
-import os
+import argparse
 from pathlib import Path
 
 from cmcrameri import cm
@@ -25,60 +25,39 @@ from plot_style import (
     apply_plotly_style,
     save_figure,
 )
-from capsule_paths import DATA_ROOT, RESULTS_ROOT
-
 apply_plot_style()
 
+ROOT_DIR = Path(__file__).resolve().parent
+MEASUREMENTS_DIR = ROOT_DIR / "data" / "pebbles" / "measurements"
+
 MEASUREMENTS = {
-    "coc_cube_low_res": (
-        DATA_ROOT / "layer_detection" / "measurements" /
-        "COC_PEBBLE_CoDA_T3_dust_low_res_vac_4"
-    ),
-    "ice_cube_tilted": (
-        DATA_ROOT / "layer_detection" / "measurements" /
-        "ICE_PEBBLE_CoDA_T3_dust_low_res_vac_6_small_fov_slow"
-    ),
-    "solid_pebble_low_res_1": (
-        DATA_ROOT / "full_3d_analysis" / "measurements" /
-        "ICE_PEBBLE_SPHERE_CoDA_T3_dust_low_res_vac_7_fast_focus_on_sohere_top"
-    ),
+    "coc_cube_low_res": MEASUREMENTS_DIR / "COC_PEBBLE_CoDA_T3_dust_low_res_vac_4",
+    "ice_cube_tilted": MEASUREMENTS_DIR / "ICE_PEBBLE_CoDA_T3_dust_low_res_vac_6_small_fov_slow",
+    "solid_pebble_low_res_1": MEASUREMENTS_DIR / "ICE_PEBBLE_SPHERE_CoDA_T3_dust_low_res_vac_7_fast_focus_on_sohere_top",
     # 38 deg phase angle
-    "solid_pebble_low_res_2": (
-        DATA_ROOT / "full_3d_analysis" / "measurements" /
-        "ICE_PEBBLE_SPHERE_CoDA_T3_dust_low_res_vac_9_fast_focus_on_sohere_top"
-    ),
+    "solid_pebble_low_res_2": MEASUREMENTS_DIR / "ICE_PEBBLE_SPHERE_CoDA_T3_dust_low_res_vac_9_fast_focus_on_sohere_top",
     # 34 deg phase angle
-    "solid_ice_pebble": (
-        DATA_ROOT / "full_3d_analysis" / "measurements" /
-        "ICE_PEBBLE_SPHERE_CoDA_T3_dust_high_res_vac_9_fast_focus_on_sohere_top"
-    ),
-    "spipa_b_pebble_low_res": (
-        DATA_ROOT / "full_3d_analysis" / "measurements" /
-        "ICE_PEBBLE_SPHERE_CoDA_T3_dust_low_res_vac_10_fast_focus_on_sphere_top"
-    ),
+    "solid_ice_pebble": MEASUREMENTS_DIR / "ICE_PEBBLE_SPHERE_CoDA_T3_dust_high_res_vac_9_fast_focus_on_sohere_top",
+    "spipa_b_pebble_low_res": MEASUREMENTS_DIR / "ICE_PEBBLE_SPHERE_CoDA_T3_dust_low_res_vac_10_fast_focus_on_sphere_top",
     # 34 deg phase angle
-    "spipa_b_pebble": (
-        DATA_ROOT / "full_3d_analysis" / "measurements" /
-        "ICE_PEBBLE_SPHERE_CoDA_T3_dust_high_res_vac_10_fast_focus_on_sphere_top"
-    ),
+    "spipa_b_pebble": MEASUREMENTS_DIR / "ICE_PEBBLE_SPHERE_CoDA_T3_dust_high_res_vac_10_fast_focus_on_sphere_top",
     # 34 deg phase angle
-    "empty_control": (
-        DATA_ROOT / "full_3d_analysis" / "measurements" /
-        "CONTROL_CoDA_T3_dust_low_res_vac_11_fast_focus_on_sphere_top"
-    ),
+    "empty_control": MEASUREMENTS_DIR / "CONTROL_CoDA_T3_dust_low_res_vac_11_fast_focus_on_sphere_top",
 }
 
-# Change this key or set THZ_ACTIVE_MEASUREMENT to select a measurement.
-ACTIVE_MEASUREMENT = os.environ.get(
-    "THZ_ACTIVE_MEASUREMENT",
-    "solid_ice_pebble",
-)
+# Change this key to select the default measurement used when no argument is given.
+ACTIVE_MEASUREMENT = "solid_ice_pebble"
 DATA_DIR = MEASUREMENTS[ACTIVE_MEASUREMENT] / "data_image_rfl"
-RESULTS_DIR = RESULTS_ROOT / "full_3d_analysis"
+RESULTS_DIR = ROOT_DIR / "results" / "full_3d_analysis"
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Run the full 3D THz analysis.")
+    parser.add_argument("path", nargs="?", type=Path, default=DATA_DIR,
+                        help="Measurement data_image_rfl directory.")
+    args = parser.parse_args()
+
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    path = get_thz_file_from_path(DATA_DIR)
+    path = get_thz_file_from_path(args.path)
 
     with DotthzFile(path) as psf_data:
         key = list(psf_data.keys())[0]
@@ -271,7 +250,7 @@ if __name__ == "__main__":
                       "Times New Roman",
 
                   "font.family":
-                      "Helvetica Neue",
+                      "Arial",
 
                   "font.size":
                       18}
@@ -299,7 +278,7 @@ if __name__ == "__main__":
             "axes.edgecolor": FOREGROUND_COLOR,
             "mathtext.fontset": "cm",
             "mathtext.rm": "Times New Roman",
-            "font.family": "Helvetica Neue",
+            "font.family": "Arial",
             "font.size": 18,
         }
         plt.rcParams.update(params)

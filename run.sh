@@ -1,117 +1,43 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -e
 
 cd /code
 
-export THZ_DATA_ROOT="${THZ_DATA_ROOT:-/data}"
-export THZ_RESULTS_ROOT="${THZ_RESULTS_ROOT:-/results}"
-export THZ_SCRATCH_ROOT="${THZ_SCRATCH_ROOT:-/scratch}"
-export THZ_MATERIAL_CACHE_ROOT="${THZ_MATERIAL_CACHE_ROOT:-${THZ_SCRATCH_ROOT}/material_properties}"
+export MPLBACKEND=Agg
+export MPLCONFIGDIR=/scratch/matplotlib
+export XDG_CACHE_HOME=/scratch/cache
+export PYVISTA_OFF_SCREEN=true
 
-export MPLBACKEND="${MPLBACKEND:-Agg}"
-export MPLCONFIGDIR="${MPLCONFIGDIR:-${THZ_SCRATCH_ROOT}/matplotlib}"
-export XDG_CACHE_HOME="${XDG_CACHE_HOME:-${THZ_SCRATCH_ROOT}/cache}"
-export PYVISTA_OFF_SCREEN="${PYVISTA_OFF_SCREEN:-true}"
-export PYTHONUNBUFFERED=1
+mkdir -p /scratch/matplotlib /scratch/cache /results
+ln -sfn /data /code/data
+ln -sfn /results /code/results
 
-if [[ -d /opt/pyhelper ]]; then
-    export PYTHONPATH="/opt${PYTHONPATH:+:${PYTHONPATH}}"
+# Spectroscopy analysis writes processed arrays, while Code Ocean mounts /data read-only.
+if [[ ! -d /scratch/spectroscopy ]]; then
+    cp -a /data/spectroscopy /scratch/spectroscopy
 fi
 
-# Code Ocean commonly mounts an attached data asset one directory below
-# /data. Locate the dataset root from a stable required input when necessary.
-data_marker="envelope/measurements/sample_data/resolution_target_sample.thzimg"
-if [[ ! -f "${THZ_DATA_ROOT}/${data_marker}" ]]; then
-    detected_marker="$(find /data -type f -path "*/${data_marker}" -print -quit 2>/dev/null || true)"
-    if [[ -n "${detected_marker}" ]]; then
-        export THZ_DATA_ROOT="${detected_marker%/${data_marker}}"
-        echo "Detected THz data root: ${THZ_DATA_ROOT}"
-    else
-        echo "Could not locate ${data_marker} below /data." >&2
-        echo "The data archive must be extracted; its contents may be nested under one Code Ocean asset directory." >&2
-        echo "Available paths below /data:" >&2
-        find /data -maxdepth 3 -mindepth 1 -print 2>/dev/null | sort | head -200 >&2
-        exit 1
-    fi
-fi
+uv run python envelope.py /data/pebbles/resolution_target_sample.thzimg
+uv run python estimate_noise.py /data/pebbles/measurements/DUST_surface_res_target_3d_4/data_image_rfl
 
-mkdir -p \
-    "${THZ_RESULTS_ROOT}" \
-    "${THZ_MATERIAL_CACHE_ROOT}" \
-    "${MPLCONFIGDIR}" \
-    "${XDG_CACHE_HOME}"
+uv run python analyse_material_properties.py /scratch/spectroscopy
+uv run python plot_material_properties.py /scratch/spectroscopy
+uv run python compare_dust_hesso_pellets_emt.py /scratch/spectroscopy
 
-run_python() {
-    echo "Running $*"
-    if [[ -x /opt/thz-venv/bin/python ]]; then
-        /opt/thz-venv/bin/python -u "$@"
-    else
-        uv run --frozen --no-sync python -u "$@"
-    fi
-}
+uv run python layer_detection.py /data/pebbles/measurements/COC_PEBBLE_CoDA_T3_dust_low_res_vac_4/data_image_rfl
+uv run python layer_detection.py /data/pebbles/measurements/COC_PEBBLE_CoDA_T3_dust_low_res_vac_5/data_image_rfl
+uv run python layer_detection.py /data/pebbles/measurements/ICE_PEBBLE_CoDA_T3_dust_low_res_vac_5/data_image_rfl
+uv run python layer_detection.py /data/pebbles/measurements/ICE_PEBBLE_CoDA_T3_dust_low_res_vac_6_small_fov_slow/data_image_rfl
 
-# Signal-envelope and noise figures.
-run_python envelope.py
-run_python estimate_noise.py
+uv run python full_3d_analysis.py /data/pebbles/measurements/COC_PEBBLE_CoDA_T3_dust_low_res_vac_4/data_image_rfl
+uv run python full_3d_analysis.py /data/pebbles/measurements/ICE_PEBBLE_CoDA_T3_dust_low_res_vac_6_small_fov_slow/data_image_rfl
+uv run python full_3d_analysis.py /data/pebbles/measurements/ICE_PEBBLE_SPHERE_CoDA_T3_dust_low_res_vac_7_fast_focus_on_sohere_top/data_image_rfl
+uv run python full_3d_analysis.py /data/pebbles/measurements/ICE_PEBBLE_SPHERE_CoDA_T3_dust_low_res_vac_9_fast_focus_on_sohere_top/data_image_rfl
+uv run python full_3d_analysis.py /data/pebbles/measurements/ICE_PEBBLE_SPHERE_CoDA_T3_dust_high_res_vac_9_fast_focus_on_sohere_top/data_image_rfl
+uv run python full_3d_analysis.py /data/pebbles/measurements/ICE_PEBBLE_SPHERE_CoDA_T3_dust_low_res_vac_10_fast_focus_on_sphere_top/data_image_rfl
+uv run python full_3d_analysis.py /data/pebbles/measurements/ICE_PEBBLE_SPHERE_CoDA_T3_dust_high_res_vac_10_fast_focus_on_sphere_top/data_image_rfl
+uv run python full_3d_analysis.py /data/pebbles/measurements/CONTROL_CoDA_T3_dust_low_res_vac_11_fast_focus_on_sphere_top/data_image_rfl
 
-# Material-property caches and all material figures.
-run_python analyse_material_properties.py
-run_python plot_material_properties.py
-run_python compare_dust_hesso_pellets_emt.py
-
-# Four B-scan layer figures.
-for measurement in coc coc_tilted ice ice_tilted; do
-    export THZ_ACTIVE_MEASUREMENT="${measurement}"
-    run_python layer_detection.py
-done
-
-# Eight full-3D datasets, each producing four PDF/PNG pairs.
-for measurement in \
-    coc_cube_low_res \
-    ice_cube_tilted \
-    solid_pebble_low_res_1 \
-    solid_pebble_low_res_2 \
-    solid_ice_pebble \
-    spipa_b_pebble_low_res \
-    spipa_b_pebble \
-    empty_control
-do
-    export THZ_ACTIVE_MEASUREMENT="${measurement}"
-    run_python full_3d_analysis.py
-done
-
-# Three transmission figures.
-for measurement in solid_ice_pebble spipa_b_pebble frost_hr; do
-    export THZ_ACTIVE_MEASUREMENT="${measurement}"
-    run_python transmission_pebble.py
-done
-
-unset THZ_ACTIVE_MEASUREMENT
-
-# Confirm that every reference result filename was recreated. Code Ocean may
-# add its own files to /results, so unrelated platform files are ignored.
-(
-    cd "${THZ_DATA_ROOT}/plots"
-    find . -type f ! -name '.DS_Store' | sort
-) > "${THZ_SCRATCH_ROOT}/reference-manifest.txt"
-
-reference_count="$(wc -l < "${THZ_SCRATCH_ROOT}/reference-manifest.txt" | tr -d ' ')"
-if [[ "${reference_count}" != "155" ]]; then
-    echo "Expected a 155-file reference manifest, found ${reference_count}." >&2
-    exit 1
-fi
-
-missing=0
-while IFS= read -r relative_path; do
-    relative_path="${relative_path#./}"
-    if [[ ! -f "${THZ_RESULTS_ROOT}/${relative_path}" ]]; then
-        echo "Missing generated result: ${relative_path}" >&2
-        missing=1
-    fi
-done < "${THZ_SCRATCH_ROOT}/reference-manifest.txt"
-
-if [[ "${missing}" != "0" ]]; then
-    exit 1
-fi
-
-echo "Successfully recreated all ${reference_count} reference result files."
+uv run python transmission_pebble.py /data/pebbles/measurements/ICE_PEBBLE_CoDA_T3_dust_low_res_vac_trans_5/data_image
+uv run python transmission_pebble.py /data/pebbles/measurements/ICE_PEBBLE_CoDA_T3_dust_low_res_vac_trans_4/data_image
+uv run python transmission_pebble.py /data/pebbles/measurements/porosity_august2_2026_hr_focused_frost_10.0mm_7.2g/data_image

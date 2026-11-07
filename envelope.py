@@ -1,3 +1,4 @@
+import argparse
 import numpy as np
 from pathlib import Path
 from pydotthz import DotthzFile
@@ -5,11 +6,10 @@ import matplotlib.pyplot as plt
 from scipy.signal import hilbert
 from scipy.ndimage import gaussian_filter1d
 from plot_style import FOREGROUND_COLOR, save_figure
-from capsule_paths import DATA_ROOT, RESULTS_ROOT
 
-DATA_FILE = (DATA_ROOT / "envelope" / "measurements" / "sample_data" /
-             "resolution_target_sample.thzimg")
-RESULTS_DIR = RESULTS_ROOT / "envelope"
+ROOT_DIR = Path(__file__).resolve().parent
+DATA_FILE = ROOT_DIR / "data" / "pebbles" / "resolution_target_sample.thzimg"
+RESULTS_DIR = ROOT_DIR / "results" / "envelope"
 
 def envelope_hilbert(x: np.ndarray, smooth_sigma: float | None = None) -> np.ndarray:
     """
@@ -77,8 +77,13 @@ def convolve1d(
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Plot THz signal envelopes.")
+    parser.add_argument("path", nargs="?", type=Path, default=DATA_FILE,
+                        help="Input .thzimg file (default: the path configured in the script).")
+    args = parser.parse_args()
+
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    with DotthzFile(DATA_FILE) as f:
+    with DotthzFile(args.path) as f:
         data = np.array(f["Image"]["dataset"])
         time = np.array(f["Image"]["time"])
         print(data.shape, time.shape)

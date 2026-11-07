@@ -1,4 +1,4 @@
-import os
+import argparse
 from pathlib import Path
 
 from cmcrameri import cm
@@ -14,10 +14,8 @@ from envelope import gaussian_kernel1d, convolve1d
 from plot_style import FOREGROUND_COLOR, apply_plot_style, save_figure
 from pyhelper import unibe
 from surface_extraction import get_thz_file_from_path, extract_surface, get_thickness
-from capsule_paths import DATA_ROOT, RESULTS_ROOT
-
-
-MEASUREMENTS_DIR = DATA_ROOT / "layer_detection" / "measurements"
+ROOT_DIR = Path(__file__).resolve().parent
+MEASUREMENTS_DIR = ROOT_DIR / "data" / "pebbles" / "measurements"
 MEASUREMENTS = {
     "coc": ("COC_PEBBLE_CoDA_T3_dust_low_res_vac_4", "COC", False),
     "coc_tilted": ("COC_PEBBLE_CoDA_T3_dust_low_res_vac_5", "COC", True),
@@ -25,18 +23,18 @@ MEASUREMENTS = {
     "ice_tilted": ("ICE_PEBBLE_CoDA_T3_dust_low_res_vac_6_small_fov_slow", "ICE", True),
 }
 
-# Change this key to select one of the four locally copied measurements above.
-ACTIVE_MEASUREMENT = os.environ.get("THZ_ACTIVE_MEASUREMENT", "coc")
+# Change this key to select the default measurement used when no argument is given.
+ACTIVE_MEASUREMENT = "coc"
 measurement_directory, MATERIAL, TILTED = MEASUREMENTS[ACTIVE_MEASUREMENT]
 DATA_DIR = MEASUREMENTS_DIR / measurement_directory / "data_image_rfl"
-PSF_DATA_DIR = DATA_ROOT / "psf" / "example_beam_width"
-RESULTS_DIR = RESULTS_ROOT / "layer_detection"
+PSF_DATA_DIR = ROOT_DIR / "data" / "pebbles" / "psf" / "example_beam_width"
+RESULTS_DIR = ROOT_DIR / "results" / "layer_detection"
 
 
 params = {
     "mathtext.fontset": "cm",
     "mathtext.rm": "Times New Roman",
-    "font.family": "Helvetica Neue",
+    "font.family": "Arial",
     "font.size": 24,
 }
 plt.rcParams.update(params)
@@ -66,11 +64,24 @@ def percentile_scale(cube, percentile=97.0):
     return scaled_float, scaled_u8, percentile_amplitude
 
 
+def measurement_settings(path: Path) -> tuple[str, bool]:
+    """Infer plot labels from a known measurement directory."""
+    measurement_name = path.parent.name if path.name == "data_image_rfl" else path.name
+    for directory, material, tilted in MEASUREMENTS.values():
+        if directory == measurement_name:
+            return material, tilted
+    return MATERIAL, TILTED
+
+
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Plot layers in a THz B-scan.")
+    parser.add_argument("path", nargs="?", type=Path, default=DATA_DIR,
+                        help="Measurement data_image_rfl directory.")
+    args = parser.parse_args()
+
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    path = get_thz_file_from_path(DATA_DIR)
-    material = MATERIAL
-    tilted = TILTED
+    path = get_thz_file_from_path(args.path)
+    material, tilted = measurement_settings(args.path)
 
     with DotthzFile(path) as measurement:
         key = list(measurement.keys())[0]

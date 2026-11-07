@@ -1,3 +1,4 @@
+import argparse
 import os
 from pathlib import Path
 
@@ -28,20 +29,23 @@ from plot_style import (
     apply_plotly_style,
     save_figure,
 )
-from capsule_paths import DATA_ROOT, RESULTS_ROOT
 
-PSF_DATA_DIR = DATA_ROOT / "psf"
-MEASUREMENTS_DIR = DATA_ROOT / "sub_surface_extraction" / "measurements"
+ROOT_DIR = Path(__file__).resolve().parent
+PSF_DATA_DIR = ROOT_DIR / "data" / "pebbles" / "psf"
+MEASUREMENTS_DIR = ROOT_DIR / "data" / "pebbles" / "measurements"
 MEASUREMENTS = {
-    "solid_low_res_34deg": "ICE_PEBBLE_SPHERE_CoDA_T3_dust_low_res_vac_9_fast_focus_on_sohere_top",
-    "spipa_b_high_res_34deg": "ICE_PEBBLE_SPHERE_CoDA_T3_dust_high_res_vac_10_fast_focus_on_sphere_top",
-    "spipa_b_low_res_34deg": "ICE_PEBBLE_SPHERE_CoDA_T3_dust_low_res_vac_11_fast_focus_on_sphere_top",
-    "empty_control_low_res_34deg": "CONTROL_CoDA_T3_dust_low_res_vac_11_fast_focus_on_sphere_top",
+    "solid_low_res_34deg": MEASUREMENTS_DIR / "ICE_PEBBLE_SPHERE_CoDA_T3_dust_low_res_vac_9_fast_focus_on_sohere_top",
+    "spipa_b_high_res_34deg": MEASUREMENTS_DIR / "ICE_PEBBLE_SPHERE_CoDA_T3_dust_high_res_vac_10_fast_focus_on_sphere_top",
+    "spipa_b_low_res_34deg": (
+        MEASUREMENTS_DIR /
+        "ICE_PEBBLE_SPHERE_CoDA_T3_dust_low_res_vac_11_fast_focus_on_sphere_top"
+    ),
+    "empty_control_low_res_34deg": MEASUREMENTS_DIR / "CONTROL_CoDA_T3_dust_low_res_vac_11_fast_focus_on_sphere_top",
 }
 
 ACTIVE_MEASUREMENT = "empty_control_low_res_34deg"
-EXAMPLE_DATA_DIR = MEASUREMENTS_DIR / MEASUREMENTS[ACTIVE_MEASUREMENT] / "data_image_rfl"
-EXAMPLE_RESULTS_DIR = RESULTS_ROOT / "sub_surface_extraction"
+EXAMPLE_DATA_DIR = MEASUREMENTS[ACTIVE_MEASUREMENT] / "data_image_rfl"
+EXAMPLE_RESULTS_DIR = ROOT_DIR / "results" / "sub_surface_extraction"
 
 params = {"ytick.color":
               "black",
@@ -62,7 +66,7 @@ params = {"ytick.color":
               "Times New Roman",
 
           "font.family":
-              "Helvetica Neue",
+              "Arial",
 
           "font.size":
               24}
@@ -296,8 +300,13 @@ def extract_pebble(times, traces, dx, dy, x_min, x_max, width, y_min, y_max, hei
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Extract a subsurface volume from a THz image.")
+    parser.add_argument("path", nargs="?", type=Path, default=EXAMPLE_DATA_DIR,
+                        help="Measurement data_image_rfl directory.")
+    args = parser.parse_args()
+
     EXAMPLE_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    path = get_thz_file_from_path(EXAMPLE_DATA_DIR)
+    path = get_thz_file_from_path(args.path)
 
     with DotthzFile(path) as psf_data:
         key = list(psf_data.keys())[0]

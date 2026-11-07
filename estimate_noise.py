@@ -1,3 +1,4 @@
+import argparse
 import os
 from pathlib import Path
 
@@ -11,18 +12,20 @@ from envelope import convolve1d, gaussian_kernel1d
 from sklearn.mixture import GaussianMixture
 from pyhelper import unibe
 from plot_style import FOREGROUND_COLOR, apply_plot_style, save_figure
-from capsule_paths import DATA_ROOT, RESULTS_ROOT
 
-MEASUREMENTS_DIR = DATA_ROOT / "estimate_noise" / "measurements"
+ROOT_DIR = Path(__file__).resolve().parent
+MEASUREMENTS_DIR = ROOT_DIR / "data" / "pebbles" / "measurements"
 MEASUREMENTS = {
-    "coc_spheres_fine_scan_3": "COC_SPHERES_fine_scan_3",
-    "dust_surface_resolution_target_3d_4": "DUST_surface_res_target_3d_4",
+    "coc_spheres_fine_scan_3": MEASUREMENTS_DIR / "COC_SPHERES_fine_scan_3",
+    "dust_surface_resolution_target_3d_4": (
+        MEASUREMENTS_DIR / "DUST_surface_res_target_3d_4"
+    ),
 }
 
 ACTIVE_MEASUREMENT = "dust_surface_resolution_target_3d_4"
-DATA_DIR = MEASUREMENTS_DIR / MEASUREMENTS[ACTIVE_MEASUREMENT] / "data_image_rfl"
-PSF_DATA_DIR = DATA_ROOT / "psf"
-RESULTS_DIR = RESULTS_ROOT / "estimate_noise"
+DATA_DIR = MEASUREMENTS[ACTIVE_MEASUREMENT] / "data_image_rfl"
+PSF_DATA_DIR = ROOT_DIR / "data" / "pebbles" / "psf"
+RESULTS_DIR = ROOT_DIR / "results" / "estimate_noise"
 
 params = {"ytick.color":
               "black",
@@ -43,7 +46,7 @@ params = {"ytick.color":
               "Times New Roman",
 
           "font.family":
-              "Helvetica Neue",
+              "Arial",
 
           "font.size":
               16}
@@ -263,8 +266,13 @@ class NoiseEstimator:
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Estimate noise in a THz image measurement.")
+    parser.add_argument("path", nargs="?", type=Path, default=DATA_DIR,
+                        help="Measurement data_image_rfl directory.")
+    args = parser.parse_args()
+
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    path = get_thz_file_from_path(DATA_DIR)
+    path = get_thz_file_from_path(args.path)
 
     with DotthzFile(path) as psf_data:
         key = list(psf_data.keys())[0]

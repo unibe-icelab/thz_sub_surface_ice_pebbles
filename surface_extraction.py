@@ -1,3 +1,4 @@
+import argparse
 import hashlib
 import os
 import pickle
@@ -16,17 +17,17 @@ from scipy.ndimage import median_filter, gaussian_filter
 from thz_deconvolution import Deconvolution
 from envelope import gaussian_kernel1d, convolve1d, envelope_hilbert
 from estimate_noise import NoiseEstimator
-from capsule_paths import DATA_ROOT, RESULTS_ROOT
 
-PSF_DATA_DIR = DATA_ROOT / "psf"
-MEASUREMENTS_DIR = DATA_ROOT / "surface_extraction" / "measurements"
+ROOT_DIR = Path(__file__).resolve().parent
+PSF_DATA_DIR = ROOT_DIR / "data" / "pebbles" / "psf"
+MEASUREMENTS_DIR = ROOT_DIR / "data" / "pebbles" / "measurements"
 MEASUREMENTS = {
     "coc_spheres_fine_scan_3": "COC_SPHERES_fine_scan_3",
 }
 
 ACTIVE_MEASUREMENT = "coc_spheres_fine_scan_3"
 EXAMPLE_DATA_DIR = MEASUREMENTS_DIR / MEASUREMENTS[ACTIVE_MEASUREMENT] / "data_image_rfl"
-EXAMPLE_RESULTS_DIR = RESULTS_ROOT / "surface_extraction"
+EXAMPLE_RESULTS_DIR = ROOT_DIR / "results" / "surface_extraction"
 
 
 def get_dynamic_range(data, percentile=0.999):
@@ -529,8 +530,13 @@ def extract_surface(times, traces, x_min, x_max, width, y_min, y_max, height, pa
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Extract a surface from a THz image measurement.")
+    parser.add_argument("path", nargs="?", type=Path, default=EXAMPLE_DATA_DIR,
+                        help="Measurement data_image_rfl directory.")
+    args = parser.parse_args()
+
     EXAMPLE_RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    path = get_thz_file_from_path(EXAMPLE_DATA_DIR)
+    path = get_thz_file_from_path(args.path)
 
     with DotthzFile(path) as psf_data:
         key = list(psf_data.keys())[0]

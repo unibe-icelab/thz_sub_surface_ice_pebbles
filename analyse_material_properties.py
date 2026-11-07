@@ -1,3 +1,4 @@
+import argparse
 import json
 import os
 from pathlib import Path
@@ -17,13 +18,12 @@ import re
 from emt import compute_bruggeman_n_eff
 from plot_style import material_color, save_figure
 from pyhelper import unibe
-from capsule_paths import CODE_ROOT, DATA_ROOT, MATERIAL_CACHE_ROOT, RESULTS_ROOT
-
-PROJECT_ROOT = CODE_ROOT
-DATA_DIR = DATA_ROOT / "material_properties"
+PROJECT_ROOT = Path(__file__).resolve().parent
+DATA_DIR = PROJECT_ROOT / "data" / "spectroscopy"
 METADATA_DIR = DATA_DIR / "metadata"
-RESULTS_DIR = RESULTS_ROOT / "material_properties" / "raw_analysis"
+RESULTS_DIR = PROJECT_ROOT / "results" / "material_properties" / "raw_analysis"
 RAW_DATA_DIR = DATA_DIR / "raw"
+MATERIAL_CACHE_ROOT = DATA_DIR
 
 
 def project_path(value: str | Path) -> Path:
@@ -33,8 +33,10 @@ def project_path(value: str | Path) -> Path:
         return path
     if len(path.parts) == 1:
         return RAW_DATA_DIR / path
+    if path.parts[:2] == ("data", "spectroscopy"):
+        return DATA_DIR.joinpath(*path.parts[2:])
     if path.parts and path.parts[0] == "data":
-        return DATA_ROOT.joinpath(*path.parts[1:])
+        return PROJECT_ROOT.joinpath(path)
     return PROJECT_ROOT / path
 
 
@@ -1021,6 +1023,16 @@ def analyse_pellets_from_config(config_path: Path,
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Analyse raw material-property measurements.")
+    parser.add_argument("path", nargs="?", type=Path, default=DATA_DIR,
+                        help="Material-properties data directory containing metadata/ and raw/.")
+    args = parser.parse_args()
+
+    DATA_DIR = args.path
+    METADATA_DIR = DATA_DIR / "metadata"
+    RAW_DATA_DIR = DATA_DIR / "raw"
+    MATERIAL_CACHE_ROOT = DATA_DIR
+
     config_files = (
         METADATA_DIR / "pellets_meta_analysis.json",
         METADATA_DIR / "sub_pellets_meta_analysis.json",

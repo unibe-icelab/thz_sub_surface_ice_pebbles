@@ -1,3 +1,4 @@
+import argparse
 import json
 import os
 from pathlib import Path
@@ -14,13 +15,11 @@ import numpy as np
 
 from emt import bruggeman_eps_eff, solve_v_i_two_component
 from plot_style import FOREGROUND_COLOR, material_color, save_figure
-from capsule_paths import DATA_ROOT, RESULTS_ROOT
-
 PROJECT_ROOT = Path(__file__).resolve().parent
-DATA_DIR = DATA_ROOT / "material_properties"
+DATA_DIR = PROJECT_ROOT / "data" / "spectroscopy"
 RAW_DATA_DIR = DATA_DIR / "raw"
 METADATA_PATH = DATA_DIR / "metadata" / "calculated_data.json"
-RESULTS_DIR = RESULTS_ROOT / "material_properties" / "mixture_analysis"
+RESULTS_DIR = PROJECT_ROOT / "results" / "material_properties" / "mixture_analysis"
 
 
 def save_result(filename: str) -> None:
@@ -226,6 +225,20 @@ max_frequency = 4.0  # THz
 
 cutoff = 1960
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Compare HESSO dust pellets with EMT mixtures.")
+    parser.add_argument("path", nargs="?", type=Path, default=DATA_DIR,
+                        help="Material-properties data directory containing metadata/ and raw/.")
+    args = parser.parse_args()
+
+    DATA_DIR = args.path
+    RAW_DATA_DIR = DATA_DIR / "raw"
+    METADATA_PATH = DATA_DIR / "metadata" / "calculated_data.json"
+    reference_path = RAW_DATA_DIR / reference_path.name
+    files = [
+        (RAW_DATA_DIR / Path(file_path).name, name, color, thickness, density)
+        for file_path, name, color, thickness, density in files
+    ]
+
     t_ref, data_ref = read_thz_file(reference_path / "data_image", roi="ROI 1")
 
     data_ref = data_ref[:, t_ref < cutoff]

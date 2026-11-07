@@ -6,6 +6,7 @@ standard deviation.  Change ``PLOT_BACKGROUND`` in :mod:`plot_style` to
 switch every export between the white and black themes.
 """
 
+import argparse
 from pathlib import Path
 
 import numpy as np
@@ -14,12 +15,9 @@ from matplotlib import pyplot as plt
 
 from plot_style import save_figure, selection_material_color
 from pyhelper import unibe
-from capsule_paths import MATERIAL_CACHE_ROOT, RESULTS_ROOT
-
-
 PROJECT_ROOT = Path(__file__).resolve().parent
-DATA_DIR = MATERIAL_CACHE_ROOT
-RESULTS_DIR = RESULTS_ROOT / "material_properties"
+DATA_DIR = PROJECT_ROOT / "data" / "spectroscopy"
+RESULTS_DIR = PROJECT_ROOT / "results" / "material_properties"
 
 # Display name, input stem, and requested output stem.
 INDIVIDUAL_MATERIALS = (
@@ -224,4 +222,9 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Plot processed material properties.")
+    parser.add_argument("path", nargs="?", type=Path, default=DATA_DIR,
+                        help="Directory containing the processed *_data.npy arrays.")
+    args = parser.parse_args()
+    DATA_DIR = args.path
     main()

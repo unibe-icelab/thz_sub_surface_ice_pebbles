@@ -1,4 +1,4 @@
-import os
+import argparse
 from pathlib import Path
 
 from cmcrameri import cm
@@ -19,9 +19,8 @@ import pyvista as pv
 import numpy as np
 from skimage.measure import marching_cubes
 from plot_style import FOREGROUND_COLOR, apply_plot_style, save_figure
-from capsule_paths import DATA_ROOT, RESULTS_ROOT
-
-MEASUREMENTS_DIR = DATA_ROOT / "transmission_pebble" / "measurements"
+ROOT_DIR = Path(__file__).resolve().parent
+MEASUREMENTS_DIR = ROOT_DIR / "data" / "pebbles" / "measurements"
 MEASUREMENTS = {
     "solid_ice_pebble": {
         "material": "solid",
@@ -74,15 +73,12 @@ REFERENCES = {
     ),
 }
 
-ACTIVE_MEASUREMENT = os.environ.get(
-    "THZ_ACTIVE_MEASUREMENT",
-    "solid_ice_pebble",
-)
+ACTIVE_MEASUREMENT = "solid_ice_pebble"
 CONFIG = MEASUREMENTS[ACTIVE_MEASUREMENT]
 MATERIAL = CONFIG["material"]
 DATA_DIR = MEASUREMENTS_DIR / CONFIG["directory"] / "data_image"
 REFERENCE_MODE, REFERENCE_PATH = REFERENCES[CONFIG["reference"]]
-RESULTS_DIR = RESULTS_ROOT / "transmission_pebble"
+RESULTS_DIR = ROOT_DIR / "results" / "transmission_pebble"
 
 params = {"ytick.color":
               "black",
@@ -103,7 +99,7 @@ params = {"ytick.color":
               "Times New Roman",
 
           "font.family":
-              "Helvetica Neue",
+              "Arial",
 
           "font.size":
               18}
@@ -219,12 +215,43 @@ def load_reference(mode, reference_path):
     raise ValueError(f"Unknown reference mode: {mode}")
 
 
-if __name__ == "__main__":
-    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    t_ref, p_ref = load_reference(REFERENCE_MODE, REFERENCE_PATH)
+def configuration_for_path(path: Path) -> dict:
+    """Use the known configuration associated with an input measurement."""
+    measurement_name = path.parent.name if path.name == "data_image" else path.name
+    for candidate in MEASUREMENTS.values():
+        if candidate["directory"] == measurement_name:
+            return candidate
+    return CONFIG
 
-    material = MATERIAL
-    path = get_thz_file_from_path(DATA_DIR)
+
+def reference_for_configuration(config: dict, input_path: Path) -> tuple[str, Path]:
+    """Resolve a reference stored beside the selected transmission measurement."""
+    measurements_dir = input_path.parent.parent if input_path.name == "data_image" else input_path.parent
+    if config["reference"] == "comet_dust_image_mean":
+        return (
+            "image_mean",
+            measurements_dir / "comet_dust_pellet_HESSO_silicon_ref_vac_3" / "data_image",
+        )
+    return (
+        "single_pixel",
+        measurements_dir / "porosity_august2_2026_focused_silicon_reference" /
+        "data" / "trans" / "single_pixel" / "1786972921.4414234_sp_data.thz",
+    )
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Plot transmission through an ice pebble.")
+    parser.add_argument("path", nargs="?", type=Path, default=DATA_DIR,
+                        help="Measurement data_image directory.")
+    args = parser.parse_args()
+
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    config = configuration_for_path(args.path)
+    reference_mode, reference_path = reference_for_configuration(config, args.path)
+    t_ref, p_ref = load_reference(reference_mode, reference_path)
+
+    material = config["material"]
+    path = get_thz_file_from_path(args.path)
 
     with DotthzFile(path) as psf_data:
         key = list(psf_data.keys())[0]
@@ -261,10 +288,10 @@ if __name__ == "__main__":
     freqs, refractive_index = get_refraction_index(times, traces, t_ref, p_ref,
                                                    window_half_width=25, win_func="hanning",
                                                    min_frequency=0.5, max_frequency=3,
-                                                   d_mm=CONFIG["d_mm"],
-                                                   mask_radius=CONFIG["mask_radius"],
-                                                   mask_center_x=CONFIG["mask_center_x"],
-                                                   mask_center_y=CONFIG["mask_center_y"])
+                                                   d_mm=config["d_mm"],
+                                                   mask_radius=config["mask_radius"],
+                                                   mask_center_x=config["mask_center_x"],
+                                                   mask_center_y=config["mask_center_y"])
 
     # plt.plot(freqs, refractive_index[width // 2, height // 2, :])
     # plt.tight_layout()
@@ -274,7 +301,7 @@ if __name__ == "__main__":
     cutoff = 2.1
     image[image > cutoff] = np.nan
     # image = refractive_index[:, :, np.round(freqs,2) == 0.5]
-    norm = Normalize(vmin=CONFIG["vmin"], vmax=CONFIG["vmax"])
+    norm = Normalize(vmin=config["vmin"], vmax=config["vmax"])
     plt.imshow(image, cmap=cm.managua, norm=norm, aspect="equal", extent=(0, x_max - x_min, 0, y_max - y_min))
     plt.colorbar(label='Refractive Index')
     plt.xlabel('X [mm]')
