@@ -25,7 +25,7 @@ helper utilities and is imported directly from the checkout.
 
 ### 2. Create and synchronize the Python environment
 
-The project requires Python 3.14 or newer and uses UV for dependency and
+The project requires Python 3.12 or newer and uses UV for dependency and
 environment management.
 
 ```bash
@@ -82,7 +82,7 @@ Place all tracked repository files, including the initialized `pyhelper`
 submodule, in `/code`. Upload the **contents** of the local `data/` directory
 to `/data`, producing `/data/pebbles/` and `/data/spectroscopy/`.
 
-Configure the capsule with Python 3.14 and install the locked environment
+Configure the capsule with Python 3.12 and install the locked environment
 during its build step:
 
 ```bash

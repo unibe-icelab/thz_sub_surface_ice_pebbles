@@ -59,15 +59,6 @@ params = {"ytick.color":
           "axes.edgecolor":
               "black",
 
-          "mathtext.fontset":
-              "cm",
-
-          "mathtext.rm":
-              "Times New Roman",
-
-          "font.family":
-              "Arial",
-
           "font.size":
               24}
 

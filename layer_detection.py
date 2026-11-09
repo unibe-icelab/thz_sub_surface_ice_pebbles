@@ -32,9 +32,6 @@ RESULTS_DIR = ROOT_DIR / "results" / "layer_detection"
 
 
 params = {
-    "mathtext.fontset": "cm",
-    "mathtext.rm": "Times New Roman",
-    "font.family": "Arial",
     "font.size": 24,
 }
 plt.rcParams.update(params)

@@ -504,7 +504,9 @@ def extract_surface(times, traces, x_min, x_max, width, y_min, y_max, height, pa
             convolved_data = convolve1d(np.abs(pulse), kernel)
             noise_mean = np.mean(np.abs(convolved_data[:60]))
             noise_std = np.std(np.abs(convolved_data[:60]))
-            smooth_threshold, components = Gmm.fit_gmm_and_get_noise_threshold(convolved_data, plot=False)
+            # smooth_threshold, components = Gmm.fit_gmm_and_get_noise_threshold(convolved_data, plot=False)
+            smooth_threshold, components = Gmm.fit_lnmm_and_get_noise_threshold(convolved_data, time=time, pulse=pulse,
+                                                                                std_multiplier=1, plot=False)
             t1 = detect_first_peak(time, convolved_data, height=smooth_threshold)
             if t1 is None:
                 t1 = t[-1]

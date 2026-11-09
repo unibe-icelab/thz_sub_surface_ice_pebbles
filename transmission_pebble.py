@@ -44,32 +44,12 @@ MEASUREMENTS = {
         "vmin": 1.0,
         "vmax": 2.0,
     },
-    "frost_hr": {
-        "material": "Frost HR",
-        "directory": "porosity_august2_2026_hr_focused_frost_10.0mm_7.2g",
-        "reference": "frost_single_pixel",
-        "d_mm": 10.0,
-        "mask_radius": 60,
-        "mask_center_x": -3,
-        "mask_center_y": -6,
-        "vmin": 1.0,
-        "vmax": 1.5,
-    },
 }
 
 REFERENCES = {
     "comet_dust_image_mean": (
         "image_mean",
         MEASUREMENTS_DIR / "comet_dust_pellet_HESSO_silicon_ref_vac_3" / "data_image",
-    ),
-    "frost_single_pixel": (
-        "single_pixel",
-        MEASUREMENTS_DIR
-        / "porosity_august2_2026_focused_silicon_reference"
-        / "data"
-        / "trans"
-        / "single_pixel"
-        / "1786972921.4414234_sp_data.thz",
     ),
 }
 
@@ -91,15 +71,6 @@ params = {"ytick.color":
 
           "axes.edgecolor":
               "black",
-
-          "mathtext.fontset":
-              "cm",
-
-          "mathtext.rm":
-              "Times New Roman",
-
-          "font.family":
-              "Arial",
 
           "font.size":
               18}
@@ -227,15 +198,11 @@ def configuration_for_path(path: Path) -> dict:
 def reference_for_configuration(config: dict, input_path: Path) -> tuple[str, Path]:
     """Resolve a reference stored beside the selected transmission measurement."""
     measurements_dir = input_path.parent.parent if input_path.name == "data_image" else input_path.parent
-    if config["reference"] == "comet_dust_image_mean":
-        return (
-            "image_mean",
-            measurements_dir / "comet_dust_pellet_HESSO_silicon_ref_vac_3" / "data_image",
-        )
+    if config["reference"] != "comet_dust_image_mean":
+        raise ValueError(f"Unknown reference: {config['reference']}")
     return (
-        "single_pixel",
-        measurements_dir / "porosity_august2_2026_focused_silicon_reference" /
-        "data" / "trans" / "single_pixel" / "1786972921.4414234_sp_data.thz",
+        "image_mean",
+        measurements_dir / "comet_dust_pellet_HESSO_silicon_ref_vac_3" / "data_image",
     )
 
 
