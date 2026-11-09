@@ -235,15 +235,6 @@ if __name__ == "__main__":
                   "axes.edgecolor":
                       FOREGROUND_COLOR,
 
-                  "mathtext.fontset":
-                      "cm",
-
-                  "mathtext.rm":
-                      "Times New Roman",
-
-                  "font.family":
-                      "Helvetica Neue",
-
                   "font.size":
                       18}
 
@@ -268,9 +259,6 @@ if __name__ == "__main__":
             "xtick.color": FOREGROUND_COLOR,
             "axes.labelcolor": FOREGROUND_COLOR,
             "axes.edgecolor": FOREGROUND_COLOR,
-            "mathtext.fontset": "cm",
-            "mathtext.rm": "Times New Roman",
-            "font.family": "Helvetica Neue",
             "font.size": 18,
         }
         plt.rcParams.update(params)
